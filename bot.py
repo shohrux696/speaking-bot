@@ -81,6 +81,10 @@ class AudioYuborish(StatesGroup):
     vazifa_id = State()
 
 
+class VazifaOchirish(StatesGroup):
+    vazifa_id = State()
+
+
 # ==================== MENYULAR ====================
 def oquvchi_menu():
     return ReplyKeyboardMarkup(
@@ -101,6 +105,7 @@ def admin_menu():
             [KeyboardButton(text="📥 Kelgan javoblar")],
             [KeyboardButton(text="👥 O'quvchilar")],
             [KeyboardButton(text="📊 Statistika")],
+            [KeyboardButton(text="🗑 Vazifani o'chirish")],
         ],
         resize_keyboard=True,
     )
@@ -314,6 +319,58 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
     await state.clear()
 
 
+# ==================== ADMIN: VAZIFANI O'CHIRISH ====================
+@dp.message(F.text == "🗑 Vazifani o'chirish")
+async def vazifa_ochirish_boshlash(message: types.Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+
+    data = load_data()
+    if not data["tasks"]:
+        await message.answer("Hozircha vazifalar yo'q.", reply_markup=admin_menu())
+        return
+
+    text = "🗑 VAZIFANI O'CHIRISH\n\nQaysi vazifani o'chirmoqchisiz?\n\n"
+    for tid, task in data["tasks"].items():
+        text += f"{tid}. {task['nomi']}\n"
+
+    text += "\nVazifa raqamini yozing:"
+    await message.answer(text, reply_markup=ortga_menu())
+    await state.set_state(VazifaOchirish.vazifa_id)
+
+
+@dp.message(VazifaOchirish.vazifa_id)
+async def vazifa_ochirish(message: types.Message, state: FSMContext):
+    if message.text == "🔙 Ortga":
+        await message.answer("Bekor qilindi.", reply_markup=admin_menu())
+        await state.clear()
+        return
+
+    task_id = message.text.strip()
+    data = load_data()
+
+    if task_id not in data["tasks"]:
+        await message.answer("Bunday vazifa topilmadi. Qaytadan yozing:")
+        return
+
+    task_nomi = data["tasks"][task_id]["nomi"]
+
+    # O'chirish
+    del data["tasks"][task_id]
+
+    # Submissionlarni ham o'chirish
+    if task_id in data["submissions"]:
+        del data["submissions"][task_id]
+
+    save_data(data)
+
+    await message.answer(
+        f"✅ Vazifa o'chirildi!\n\n📝 {task_nomi}",
+        reply_markup=admin_menu(),
+    )
+    await state.clear()
+
+
 # ==================== O'QUVCHI: VAZIFALAR ====================
 @dp.message(F.text == "📚 Vazifalar")
 async def oquvchi_vazifalar(message: types.Message):
@@ -370,10 +427,25 @@ async def audio_vazifa_id(message: types.Message, state: FSMContext):
 
     task_id = message.text.strip()
     data = load_data()
+    user_id = str(message.from_user.id)
 
     if task_id not in data["tasks"]:
         await message.answer("Bunday vazifa topilmadi. Qaytadan yozing:")
         return
+
+    # KETMA-KETLIKNI TEKSHIRISH
+    tasks = sorted(data["tasks"].items(), key=lambda x: int(x[0]))
+    for tid, task in tasks:
+        if tid == task_id:
+            break
+        subs = data["submissions"].get(tid, {})
+        if user_id not in subs:
+            await message.answer(
+                f"⚠️ Avval {tid}-vazifani bajaring!\n\n"
+                f"📝 {task['nomi']}\n\n"
+                f"Keyin {task_id}-vazifaga o'tishingiz mumkin."
+            )
+            return
 
     await state.update_data(task_id=task_id)
     await message.answer(
@@ -414,21 +486,32 @@ async def audio_qabul(message: types.Message, state: FSMContext):
 
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     try:
-        prompt = f"""Sen ingliz tili o'qituvchisisan.
+        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi speaking topshirig'ini bajardi.
 
 SAVOL: {task['savol']}
 
 Quyidagi audioni tahlil qil:
 
 1. 📝 TRANSCRIPT — o'quvchi aytgan gaplarni so'zma-so'z yoz
-2. ❌ GRAMMAR — grammatik xatolar (xato → to'g'ri)
-3. 📚 VOCABULARY — yaxshiroq so'zlar taklifi
-4. 🔗 COLLOCATIONS — noto'g'ri birikmalar
-5. 📍 PREPOSITIONS — xato predloglar
-6. 🗣 FLUENCY — nutq ravonligi (pauzalar, filler words)
-7. 🧠 CONTENT — savolga to'liq javob berilganmi
-8. ✨ IMPROVED VERSION — yaxshilangan to'liq javob
-9. 🎯 TAVSIYA — 3-5 ta maslahat
+2. 📊 BAHO — 0 dan 100 gacha aniq foizda ber (masalan: 73%, 85%):
+   - Accuracy (aniqlik): X%
+   - Vocabulary (so'z boyligi): X%
+   - Fluency (ravonlik): X%
+   - Grammar (grammatika): X%
+   - Pronunciation (talaffuz): X%
+   - Overall (umumiy): X%
+3. 📝 IZOH — nega shunday baho berganingizni tushuntiring:
+   - Nima yaxshi (✅)
+   - Nima o'rtacha (⚠️)
+   - Nima yomon (❌)
+4. ❌ GRAMMAR — grammatik xatolar (xato → to'g'ri)
+5. 📚 VOCABULARY — yaxshiroq so'zlar taklifi
+6. 🔗 COLLOCATIONS — noto'g'ri birikmalar
+7. 📍 PREPOSITIONS — xato predloglar
+8. 🗣 FLUENCY — nutq ravonligi (pauzalar, filler words)
+9. 🧠 CONTENT — savolga to'liq javob berilganmi
+10. ✨ IMPROVED VERSION — yaxshilangan to'liq javob
+11. 🎯 TAVSIYA — 3-5 ta maslahat
 
 MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
 O'zbek tilida yoz. Qisqa va aniq."""
@@ -438,7 +521,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
             model="whisper-large-v3-turbo",
         )
         response = groq_client.chat.completions.create(
-                        model="openai/gpt-oss-20b",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": f"{prompt}\n\nO'quvchi javobi:\n{tr.text}"}],
         )
         ai_tahlil = response.choices[0].message.content
@@ -596,6 +679,66 @@ async def profilim(message: types.Message):
     )
 
 
+# ==================== AI SUHBAT ====================
+@dp.message(F.text & ~F.text.startswith('/'))
+async def ai_suhbat(message: types.Message):
+    if is_admin(message.from_user.id):
+        return
+
+    tugmalar = [
+        "📚 Vazifalar", "📊 Natijam", "🏆 Ranking", "👤 Profilim",
+        "📚 Vazifa berish", "📥 Kelgan javoblar", "👥 O'quvchilar", "📊 Statistika",
+        "🗑 Vazifani o'chirish",
+        "🔙 Ortga", "✅ Yuborish", "❌ Bekor qilish",
+    ]
+
+    if message.text in tugmalar:
+        return
+
+    user_id = str(message.from_user.id)
+    data = load_data()
+
+    if user_id not in data["students"]:
+        return
+
+    if not message.text or len(message.text) < 3:
+        return
+
+    await message.answer("🤔 O'ylayapman...")
+
+    try:
+        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi senga savol berdi:
+
+SAVOL: {message.text}
+
+Quyidagilarni bajar:
+
+1. 📝 SAVOLGA JAVOB — qisqa va aniq javob ber
+2. 💡 IDEALAR — 3-4 ta fikr taklif qil (ingliz tilida)
+3. 📚 YANGI SO'ZLAR — 3-5 ta foydali so'z va ibora (tarjimasi bilan)
+4. ❓ QO'SHIMCHA SAVOL — o'quvchiga qo'shimcha savol ber (ingliz tilida)
+5. ✅ TUSHUNARLI — barchasi oddiy va tushunarli tilda yozilgan
+
+MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
+O'zbek tilida yoz. Qisqa va aniq."""
+
+        response = groq_client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        ai_javob = response.choices[0].message.content
+
+        if len(ai_javob) > 4000:
+            for i in range(0, len(ai_javob), 4000):
+                await message.answer(ai_javob[i:i+4000])
+        else:
+            await message.answer(f"🤖 AI JAVOBI:\n\n{ai_javob}")
+
+    except Exception as e:
+        logger.error(f"AI suhbat xatosi: {e}")
+        await message.answer(f"⚠️ Xatolik: {e}")
+
+
 # ==================== TEST ====================
 @dp.message(Command("test"))
 async def test_groq(message: types.Message):
@@ -603,7 +746,7 @@ async def test_groq(message: types.Message):
         return
     try:
         response = groq_client.chat.completions.create(
-                        model="openai/gpt-oss-20b",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
         )
         await message.answer(f"✅ Groq ishlayapti:\n\n{response.choices[0].message.content}")
