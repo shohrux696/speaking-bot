@@ -11,8 +11,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
-TOKEN = os.getenv("TOKEN", "8722732480:AAHJxkxpT3lbw0NrZuCZTij3EXMFBfxMR0s")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "8404832881"))
+TOKEN = "8722732480:AAHJxkxpT3lbw0NrZuCZTij3EXMFBfxMR0s"
+ADMIN_ID = 8404832881
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
