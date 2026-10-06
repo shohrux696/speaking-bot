@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+gemini_model = genai.GenerativeModel("gemini-3.8-flash")
 
 DATA_FILE = "data.json"
 
@@ -441,12 +441,8 @@ Quyidagi audioni tahlil qil:
 MUHIM: Markdown belgilar ishlatma (*, _, #, `). Faqat emoji va oddiy matn ishlatilsin.
 O'zbek tilida yoz. Qisqa va aniq."""
 
-               interaction = gemini_model.interactions.create(
-            model="gemini-3.8-flash",
-            input=[prompt, audio_part],
-            generation_config={"thinking_level": "medium"}
-        )
-        ai_tahlil = interaction.output_text
+        response = gemini_model.generate_content([prompt, audio_part])
+        ai_tahlil = response.text
     except Exception as e:
         logger.error(f"Gemini xatosi: {e}")
         ai_tahlil = f"⚠️ AI xatosi: {e}"
@@ -485,7 +481,6 @@ O'zbek tilida yoz. Qisqa va aniq."""
         )
         await bot.send_voice(ADMIN_ID, message.voice.file_id)
 
-        # AI tahlilni adminga ham yuborish
         admin_text = f"🤖 AI TAHLIL ({ism}):\n\n{ai_tahlil}"
         if len(admin_text) > 4000:
             for i in range(0, len(admin_text), 4000):
