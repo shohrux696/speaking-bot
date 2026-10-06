@@ -2,7 +2,6 @@ import os
 import asyncio
 import json
 import logging
-import base64
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -21,7 +20,6 @@ GEMINI_API_KEY = "AQ.Ab8RN6INx3e3k3zQi-M_n631xNrDnJaqhjpJXnxXcrpMDQmxzg"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Gemini sozlash
 genai.configure(api_key=GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
@@ -75,27 +73,27 @@ async def gemini_tahlil(transcript, savol):
 
 SAVOL: {savol}
 
-O'QUVCHI JAVOBI (transcript):
+O'QUVCHI JAVOBI:
 {transcript}
 
 Quyidagi tahlilni o'zbek tilida ber:
 
-1. ❌ GRAMMAR XATOLARI — xato va to'g'ri variant
-2. 📚 VOCABULARY — yaxshiroq so'zlar taklifi
-3. 🔗 COLLOCATIONS — noto'g'ri birikmalar
-4. 📍 PREPOSITIONS — xato predloglar
-5. 🗣 FLUENCY — nutq ravonligi
-6. 🧠 CONTENT — savolga javob berilganmi
-7. ✨ IMPROVED VERSION — yaxshilangan to'liq javob
-8. 🎯 TAVSIYA — 3-5 ta maslahat
+1. ❌ GRAMMAR XATOLARI
+2. 📚 VOCABULARY
+3. 🔗 COLLOCATIONS
+4. 📍 PREPOSITIONS
+5. 🗣 FLUENCY
+6. 🧠 CONTENT
+7. ✨ IMPROVED VERSION
+8. 🎯 TAVSIYA
 
-Qisqa va aniq yoz. Faqat tahlilni ber."""
+Qisqa va aniq yoz."""
 
         response = gemini_model.generate_content(prompt)
         return response.text
     except Exception as e:
         logger.error(f"Gemini xatosi: {e}")
-        return f"⚠️ AI tahlilida xatolik: {e}"
+        return f"⚠️ AI xatosi: {e}"
 
 
 # ==================== HOLATLAR ====================
@@ -164,10 +162,7 @@ async def start_handler(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
 
     if is_admin(user_id):
-        await message.answer(
-            "👨‍🏫 Salom, teacher!\n\nAdmin panel:",
-            reply_markup=admin_menu(),
-        )
+        await message.answer("👨‍🏫 Salom, teacher!\n\nAdmin panel:", reply_markup=admin_menu())
         return
 
     data = load_data()
@@ -247,10 +242,7 @@ async def vazifa_berish_boshlash(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
     await state.update_data(tur="asosiy")
-    await message.answer(
-        "📚 YANGI VAZIFA\n\n1️⃣ Vazifa nomini yozing:",
-        reply_markup=ortga_menu(),
-    )
+    await message.answer("📚 YANGI VAZIFA\n\n1️⃣ Vazifa nomini yozing:", reply_markup=ortga_menu())
     await state.set_state(VazifaBerish.nomi)
 
 
@@ -264,9 +256,7 @@ async def vazifa_nomi(message: types.Message, state: FSMContext):
         await message.answer("Vazifa nomini matn ko'rinishida yozing:")
         return
     await state.update_data(nomi=message.text.strip())
-    await message.answer(
-        f"✅ Nomi: {message.text.strip()}\n\n2️⃣ Speaking savolini yozing:"
-    )
+    await message.answer(f"✅ Nomi: {message.text.strip()}\n\n2️⃣ Speaking savolini yozing:")
     await state.set_state(VazifaBerish.savol)
 
 
@@ -280,9 +270,7 @@ async def vazifa_savol(message: types.Message, state: FSMContext):
         await message.answer("Savolni matn ko'rinishida yozing:")
         return
     await state.update_data(savol=message.text.strip())
-    await message.answer(
-        "✅ Savol qabul qilindi.\n\n3️⃣ Deadline kiriting (masalan: 2026-10-10 20:00):"
-    )
+    await message.answer("✅ Savol qabul qilindi.\n\n3️⃣ Deadline kiriting (masalan: 2026-10-10 20:00):")
     await state.set_state(VazifaBerish.deadline)
 
 
@@ -347,20 +335,14 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
         try:
             await bot.send_message(
                 int(uid),
-                f"📚 YANGI VAZIFA\n\n"
-                f"📝 {nomi}\n\n"
-                f"❓ {savol}\n\n"
-                f"⏰ Deadline: {deadline}\n\n"
+                f"📚 YANGI VAZIFA\n\n📝 {nomi}\n\n❓ {savol}\n\n⏰ Deadline: {deadline}\n\n"
                 f"Topshirish uchun /submit buyrug'ini bosing.",
             )
             sent += 1
         except Exception as e:
             logger.error(f"Xabar yuborish xatosi {uid}: {e}")
 
-    await message.answer(
-        f"✅ Vazifa {sent} ta o'quvchiga yuborildi!",
-        reply_markup=admin_menu(),
-    )
+    await message.answer(f"✅ Vazifa {sent} ta o'quvchiga yuborildi!", reply_markup=admin_menu())
     await state.clear()
 
 
@@ -384,14 +366,8 @@ async def oquvchi_vazifalar(message: types.Message):
     text = "📚 VAZIFALAR\n\n"
     for tid, task in data["tasks"].items():
         submitted = data["submissions"].get(tid, {})
-        if user_id in submitted:
-            status = "🟢 Yuborilgan"
-        else:
-            status = "🔴 Yuborilmagan"
-
-        text += f"{tid}. {task['nomi']}\n"
-        text += f"   {status}\n"
-        text += f"   ⏰ {task['deadline']}\n\n"
+        status = "🟢 Yuborilgan" if user_id in submitted else "🔴 Yuborilmagan"
+        text += f"{tid}. {task['nomi']}\n   {status}\n   ⏰ {task['deadline']}\n\n"
 
     text += "Topshirish uchun /submit buyrug'ini bosing."
     await message.answer(text)
@@ -433,8 +409,7 @@ async def audio_vazifa_id(message: types.Message, state: FSMContext):
 
     await state.update_data(task_id=task_id)
     await message.answer(
-        f"✅ Vazifa: {data['tasks'][task_id]['nomi']}\n\n"
-        f"🎤 Endi audio javobingizni yuboring:",
+        f"✅ Vazifa: {data['tasks'][task_id]['nomi']}\n\n🎤 Endi audio javobingizni yuboring:",
         reply_markup=ortga_menu(),
     )
 
@@ -457,8 +432,7 @@ async def audio_qabul(message: types.Message, state: FSMContext):
         return
 
     task = data["tasks"][task_id]
-
-    await message.answer("⏳ Audio qabul qilindi. AI tahlil qilmoqda...")
+    await message.answer("⏳ Audio qabul qilindi. O'qituvchiga yuborilmoqda...")
 
     if task_id not in data["submissions"]:
         data["submissions"][task_id] = {}
@@ -476,26 +450,16 @@ async def audio_qabul(message: types.Message, state: FSMContext):
     try:
         await bot.send_message(
             ADMIN_ID,
-            f"📥 YANGI AUDIO!\n\n"
-            f"👤 {ism} ({guruh})\n"
-            f"📚 Vazifa: {task['nomi']}\n"
-            f"⏰ {now_str()}",
+            f"📥 YANGI AUDIO!\n\n👤 {ism} ({guruh})\n📚 Vazifa: {task['nomi']}\n⏰ {now_str()}",
         )
         await bot.send_voice(ADMIN_ID, message.voice.file_id)
-
-        # O'quvchiga tasdiq
-        await message.answer(
-            "✅ Audio yuborildi!\n\n"
-            "📌 O'qituvchi tekshirib, ball beradi.",
-            reply_markup=oquvchi_menu(),
-        )
     except Exception as e:
         logger.error(f"Admin xabari xatosi: {e}")
-        await message.answer(
-            "✅ Audio qabul qilindi!",
-            reply_markup=oquvchi_menu(),
-        )
 
+    await message.answer(
+        "✅ Audio yuborildi!\n\n📌 O'qituvchi tekshirib, ball beradi.",
+        reply_markup=oquvchi_menu(),
+    )
     await state.clear()
 
 
@@ -519,9 +483,7 @@ async def kelgan_javoblar(message: types.Message):
                 student = data["students"].get(uid, {})
                 ism = student.get("ism", "Nomalum")
                 guruh = student.get("guruh", "—")
-                text += f"👤 {ism} ({guruh})\n"
-                text += f"📚 {task_name}\n"
-                text += f"⏰ {sub.get('submitted_at')}\n\n"
+                text += f"👤 {ism} ({guruh})\n📚 {task_name}\n⏰ {sub.get('submitted_at')}\n\n"
                 count += 1
 
     if count == 0:
@@ -556,17 +518,9 @@ async def admin_statistika(message: types.Message):
     data = load_data()
     total_students = len(data["students"])
     total_tasks = len(data["tasks"])
+    total_subs = sum(len(subs) for subs in data["submissions"].values())
 
-    total_subs = 0
-    for task_id, subs in data["submissions"].items():
-        total_subs += len(subs)
-
-    text = (
-        f"📊 STATISTIKA\n\n"
-        f"👥 O'quvchilar: {total_students}\n"
-        f"📚 Vazifalar: {total_tasks}\n"
-        f"📥 Javoblar: {total_subs}\n"
-    )
+    text = f"📊 STATISTIKA\n\n👥 O'quvchilar: {total_students}\n📚 Vazifalar: {total_tasks}\n📥 Javoblar: {total_subs}\n"
     await message.answer(text)
 
 
@@ -581,18 +535,11 @@ async def natijam(message: types.Message):
         await message.answer("Avval /start bosing.")
         return
     s = data["students"][user_id]
-
-    total_subs = 0
-    for task_id, subs in data["submissions"].items():
-        if user_id in subs:
-            total_subs += 1
+    total_subs = sum(1 for tid, subs in data["submissions"].items() if user_id in subs)
 
     await message.answer(
-        f"📊 Natijangiz:\n\n"
-        f"👤 {s.get('ism')}\n"
-        f"🏫 {s.get('guruh')}\n"
-        f"📚 Topshirilgan: {total_subs}\n"
-        f"💰 Ball: {s.get('ball', 0)}"
+        f"📊 Natijangiz:\n\n👤 {s.get('ism')}\n🏫 {s.get('guruh')}\n"
+        f"📚 Topshirilgan: {total_subs}\n💰 Ball: {s.get('ball', 0)}"
     )
 
 
@@ -614,29 +561,12 @@ async def profilim(message: types.Message):
         return
     s = data["students"][user_id]
     await message.answer(
-        f"👤 Profilingiz:\n\n"
-        f"Ism: {s.get('ism')}\n"
-        f"Guruh: {s.get('guruh')}\n"
+        f"👤 Profilingiz:\n\nIsm: {s.get('ism')}\nGuruh: {s.get('guruh')}\n"
         f"Ro'yxatdan o'tgan: {s.get('registered')}"
     )
 
 
 # ==================== WEB SERVER ====================
-async def handle(request):
-    return web.Response(text="🤖 Speaking Bot ishlayapti!")
-
-
-async def web_server():
-    app = web.Application()
-    app.router.add_get("/", handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 8080))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logger.info(f"Web server {port}-portda ishga tushdi.")
-
-
 async def handle(request):
     return web.Response(text="🤖 Speaking Bot ishlayapti!")
 
