@@ -10,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
-import google.generativeai as genai
+from groq import Groq
 
 # ==================== SOZLAMALAR ====================
 TOKEN = os.environ.get("TOKEN", "")
@@ -20,8 +20,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-3.8-flash")
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
 DATA_FILE = "data.json"
 
@@ -441,8 +440,15 @@ Quyidagi audioni tahlil qil:
 MUHIM: Markdown belgilar ishlatma (*, _, #, `). Faqat emoji va oddiy matn ishlatilsin.
 O'zbek tilida yoz. Qisqa va aniq."""
 
-        response = gemini_model.generate_content([prompt, audio_part])
-        ai_tahlil = response.text
+       tr = groq_client.audio.transcriptions.create(
+    file=("audio.ogg", audio_data),
+    model="whisper-large-v3-turbo",
+)
+response = groq_client.chat.completions.create(
+    model="llama-3.1-8b-instant",
+    messages=[{"role": "user", "content": f"{prompt}\n\nO'quvchi javobi:\n{tr.text}"}],
+)
+ai_tahlil = response.choices[0].message.content
     except Exception as e:
         logger.error(f"Gemini xatosi: {e}")
         ai_tahlil = f"⚠️ AI xatosi: {e}"
