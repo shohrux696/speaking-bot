@@ -2,6 +2,7 @@ import os
 import asyncio
 import json
 import logging
+import base64
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -10,12 +11,19 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
+import google.generativeai as genai
 
+# ==================== SOZLAMALAR ====================
 TOKEN = "8722732480:AAHJxkxpT3lbw0NrZuCZTij3EXMFBfxMR0s"
 ADMIN_ID = 8404832881
+GEMINI_API_KEY = "AQ.Ab8RN6INx3e3k3zQi-M_n631xNrDnJaqhjpJXnxXcrpMDQmxzg"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Gemini sozlash
+genai.configure(api_key=GEMINI_API_KEY)
+gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
 DATA_FILE = "data.json"
 
@@ -23,7 +31,6 @@ DEFAULT_DATA = {
     "students": {},
     "tasks": {},
     "submissions": {},
-    "extra_tasks": {},
 }
 
 bot = Bot(token=TOKEN)
@@ -60,6 +67,38 @@ def now_str():
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
+# ==================== GEMINI AI ====================
+async def gemini_tahlil(transcript, savol):
+    """Gemini orqali speaking tahlil qilish"""
+    try:
+        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi speaking topshirig'ini bajargan.
+
+SAVOL: {savol}
+
+O'QUVCHI JAVOBI (transcript):
+{transcript}
+
+Quyidagi tahlilni o'zbek tilida ber:
+
+1. ❌ GRAMMAR XATOLARI — xato va to'g'ri variant
+2. 📚 VOCABULARY — yaxshiroq so'zlar taklifi
+3. 🔗 COLLOCATIONS — noto'g'ri birikmalar
+4. 📍 PREPOSITIONS — xato predloglar
+5. 🗣 FLUENCY — nutq ravonligi
+6. 🧠 CONTENT — savolga javob berilganmi
+7. ✨ IMPROVED VERSION — yaxshilangan to'liq javob
+8. 🎯 TAVSIYA — 3-5 ta maslahat
+
+Qisqa va aniq yoz. Faqat tahlilni ber."""
+
+        response = gemini_model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        logger.error(f"Gemini xatosi: {e}")
+        return f"⚠️ AI tahlilida xatolik: {e}"
+
+
+# ==================== HOLATLAR ====================
 class Royxat(StatesGroup):
     ism = State()
     guruh = State()
@@ -72,22 +111,15 @@ class VazifaBerish(StatesGroup):
     tasdiqlash = State()
 
 
-class QoshimchaVazifa(StatesGroup):
-    nomi = State()
-    savol = State()
-    deadline = State()
-    tasdiqlash = State()
-
-
 class AudioYuborish(StatesGroup):
     vazifa_id = State()
 
 
+# ==================== MENYULAR ====================
 def oquvchi_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📚 Vazifalar")],
-            [KeyboardButton(text="➕ Qo'shimcha vazifalar")],
             [KeyboardButton(text="📊 Natijam")],
             [KeyboardButton(text="🏆 Ranking")],
             [KeyboardButton(text="👤 Profilim")],
@@ -100,7 +132,6 @@ def admin_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📚 Vazifa berish")],
-            [KeyboardButton(text="➕ Qo'shimcha vazifa berish")],
             [KeyboardButton(text="📥 Kelgan javoblar")],
             [KeyboardButton(text="👥 O'quvchilar")],
             [KeyboardButton(text="📊 Statistika")],
@@ -126,6 +157,7 @@ def ortga_menu():
     )
 
 
+# ==================== START ====================
 @dp.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
     await state.clear()
@@ -210,14 +242,13 @@ async def royxat_guruh(message: types.Message, state: FSMContext):
 
 
 # ==================== ADMIN: VAZIFA BERISH ====================
-
 @dp.message(F.text == "📚 Vazifa berish")
 async def vazifa_berish_boshlash(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
     await state.update_data(tur="asosiy")
     await message.answer(
-        "📚 YANGI ASOSIY VAZIFA\n\n1️⃣ Vazifa nomini yozing:",
+        "📚 YANGI VAZIFA\n\n1️⃣ Vazifa nomini yozing:",
         reply_markup=ortga_menu(),
     )
     await state.set_state(VazifaBerish.nomi)
@@ -270,14 +301,12 @@ async def vazifa_deadline(message: types.Message, state: FSMContext):
     nomi = data_user.get("nomi")
     savol = data_user.get("savol")
     deadline = data_user.get("deadline")
-    tur = data_user.get("tur", "asosiy")
 
     data = load_data()
     students_count = len(data["students"])
 
     text = (
         f"📋 TASDIQLASH\n\n"
-        f"📌 Turi: {'📚 Asosiy' if tur == 'asosiy' else '➕ Qo\'shimcha'}\n"
         f"📝 Nomi: {nomi}\n\n"
         f"❓ Savol:\n{savol}\n\n"
         f"⏰ Deadline: {deadline}\n"
@@ -302,7 +331,6 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
     nomi = data_user.get("nomi")
     savol = data_user.get("savol")
     deadline = data_user.get("deadline")
-    tur = data_user.get("tur", "asosiy")
 
     data = load_data()
     task_id = str(len(data["tasks"]) + 1)
@@ -310,7 +338,6 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
         "nomi": nomi,
         "savol": savol,
         "deadline": deadline,
-        "tur": tur,
         "created": now_str(),
     }
     save_data(data)
@@ -320,11 +347,11 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
         try:
             await bot.send_message(
                 int(uid),
-                f"{'📚 YANGI ASOSIY VAZIFA' if tur == 'asosiy' else '➕ YANGI QO\'SHIMCHA VAZIFA'}\n\n"
+                f"📚 YANGI VAZIFA\n\n"
                 f"📝 {nomi}\n\n"
                 f"❓ {savol}\n\n"
                 f"⏰ Deadline: {deadline}\n\n"
-                f"Vazifani topshirish uchun '📚 Vazifalar' tugmasini bosing.",
+                f"Topshirish uchun /submit buyrug'ini bosing.",
             )
             sent += 1
         except Exception as e:
@@ -338,7 +365,6 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
 
 
 # ==================== O'QUVCHI: VAZIFALAR ====================
-
 @dp.message(F.text == "📚 Vazifalar")
 async def oquvchi_vazifalar(message: types.Message):
     if is_admin(message.from_user.id):
@@ -351,14 +377,12 @@ async def oquvchi_vazifalar(message: types.Message):
         await message.answer("Avval /start bosing.")
         return
 
-    tasks = [(tid, t) for tid, t in data["tasks"].items() if t.get("tur") == "asosiy"]
-
-    if not tasks:
-        await message.answer("📚 Hozircha asosiy vazifalar yo'q.")
+    if not data["tasks"]:
+        await message.answer("📚 Hozircha vazifalar yo'q.")
         return
 
-    text = "📚 ASOSIY VAZIFALAR\n\n"
-    for tid, task in tasks:
+    text = "📚 VAZIFALAR\n\n"
+    for tid, task in data["tasks"].items():
         submitted = data["submissions"].get(tid, {})
         if user_id in submitted:
             status = "🟢 Yuborilgan"
@@ -369,45 +393,11 @@ async def oquvchi_vazifalar(message: types.Message):
         text += f"   {status}\n"
         text += f"   ⏰ {task['deadline']}\n\n"
 
-    text += "Vazifani topshirish uchun /submit buyrug'ini bosing."
-    await message.answer(text)
-
-
-@dp.message(F.text == "➕ Qo'shimcha vazifalar")
-async def oquvchi_qoshimcha(message: types.Message):
-    if is_admin(message.from_user.id):
-        return
-
-    data = load_data()
-    user_id = str(message.from_user.id)
-
-    if user_id not in data["students"]:
-        await message.answer("Avval /start bosing.")
-        return
-
-    tasks = [(tid, t) for tid, t in data["tasks"].items() if t.get("tur") == "qoshimcha"]
-
-    if not tasks:
-        await message.answer("➕ Hozircha qo'shimcha vazifalar yo'q.")
-        return
-
-    text = "➕ QO'SHIMCHA VAZIFALAR\n\n"
-    for tid, task in tasks:
-        submitted = data["submissions"].get(tid, {})
-        if user_id in submitted:
-            status = "🟢 Yuborilgan"
-        else:
-            status = "🔴 Yuborilmagan"
-
-        text += f"{tid}. {task['nomi']}\n"
-        text += f"   {status}\n"
-        text += f"   ⏰ {task['deadline']}\n\n"
-
+    text += "Topshirish uchun /submit buyrug'ini bosing."
     await message.answer(text)
 
 
 # ==================== O'QUVCHI: AUDIO YUBORISH ====================
-
 @dp.message(Command("submit"))
 async def submit_start(message: types.Message, state: FSMContext):
     if is_admin(message.from_user.id):
@@ -427,10 +417,11 @@ async def submit_start(message: types.Message, state: FSMContext):
     await state.set_state(AudioYuborish.vazifa_id)
 
 
-@dp.message(AudioYuborish.vazifa_id)
+@dp.message(AudioYuborish.vazifa_id, F.text)
 async def audio_vazifa_id(message: types.Message, state: FSMContext):
-    if not message.text:
-        await message.answer("Vazifa raqamini yozing:")
+    if message.text == "🔙 Ortga":
+        await message.answer("Bekor qilindi.", reply_markup=oquvchi_menu())
+        await state.clear()
         return
 
     task_id = message.text.strip()
@@ -465,6 +456,10 @@ async def audio_qabul(message: types.Message, state: FSMContext):
         await state.clear()
         return
 
+    task = data["tasks"][task_id]
+
+    await message.answer("⏳ Audio qabul qilindi. AI tahlil qilmoqda...")
+
     if task_id not in data["submissions"]:
         data["submissions"][task_id] = {}
 
@@ -478,28 +473,33 @@ async def audio_qabul(message: types.Message, state: FSMContext):
     ism = data["students"][user_id].get("ism", "Nomalum")
     guruh = data["students"][user_id].get("guruh", "—")
 
-    await message.answer(
-        "✅ Audio qabul qilindi!\n\nO'qituvchi tekshiradi.",
-        reply_markup=oquvchi_menu(),
-    )
-
     try:
         await bot.send_message(
             ADMIN_ID,
             f"📥 YANGI AUDIO!\n\n"
             f"👤 {ism} ({guruh})\n"
-            f"📚 Vazifa: {data['tasks'][task_id]['nomi']}\n"
+            f"📚 Vazifa: {task['nomi']}\n"
             f"⏰ {now_str()}",
         )
         await bot.send_voice(ADMIN_ID, message.voice.file_id)
+
+        # O'quvchiga tasdiq
+        await message.answer(
+            "✅ Audio yuborildi!\n\n"
+            "📌 O'qituvchi tekshirib, ball beradi.",
+            reply_markup=oquvchi_menu(),
+        )
     except Exception as e:
         logger.error(f"Admin xabari xatosi: {e}")
+        await message.answer(
+            "✅ Audio qabul qilindi!",
+            reply_markup=oquvchi_menu(),
+        )
 
     await state.clear()
 
 
 # ==================== ADMIN: KELGAN JAVOBLAR ====================
-
 @dp.message(F.text == "📥 Kelgan javoblar")
 async def kelgan_javoblar(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -531,7 +531,6 @@ async def kelgan_javoblar(message: types.Message):
 
 
 # ==================== ADMIN: O'QUVCHILAR ====================
-
 @dp.message(F.text == "👥 O'quvchilar")
 async def admin_oquvchilar(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -558,16 +557,20 @@ async def admin_statistika(message: types.Message):
     total_students = len(data["students"])
     total_tasks = len(data["tasks"])
 
+    total_subs = 0
+    for task_id, subs in data["submissions"].items():
+        total_subs += len(subs)
+
     text = (
         f"📊 STATISTIKA\n\n"
         f"👥 O'quvchilar: {total_students}\n"
         f"📚 Vazifalar: {total_tasks}\n"
+        f"📥 Javoblar: {total_subs}\n"
     )
     await message.answer(text)
 
 
 # ==================== O'QUVCHI: NATIJA, RANKING, PROFIL ====================
-
 @dp.message(F.text == "📊 Natijam")
 async def natijam(message: types.Message):
     if is_admin(message.from_user.id):
@@ -619,7 +622,6 @@ async def profilim(message: types.Message):
 
 
 # ==================== WEB SERVER ====================
-
 async def handle(request):
     return web.Response(text="🤖 Speaking Bot ishlayapti!")
 
