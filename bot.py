@@ -65,37 +65,6 @@ def now_str():
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
-# ==================== GEMINI AI ====================
-async def gemini_tahlil(transcript, savol):
-    """Gemini orqali speaking tahlil qilish"""
-    try:
-        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi speaking topshirig'ini bajargan.
-
-SAVOL: {savol}
-
-O'QUVCHI JAVOBI:
-{transcript}
-
-Quyidagi tahlilni o'zbek tilida ber:
-
-1. ❌ GRAMMAR XATOLARI
-2. 📚 VOCABULARY
-3. 🔗 COLLOCATIONS
-4. 📍 PREPOSITIONS
-5. 🗣 FLUENCY
-6. 🧠 CONTENT
-7. ✨ IMPROVED VERSION
-8. 🎯 TAVSIYA
-
-Qisqa va aniq yoz."""
-
-        response = gemini_model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        logger.error(f"Gemini xatosi: {e}")
-        return f"⚠️ AI xatosi: {e}"
-
-
 # ==================== HOLATLAR ====================
 class Royxat(StatesGroup):
     ism = State()
@@ -432,8 +401,52 @@ async def audio_qabul(message: types.Message, state: FSMContext):
         return
 
     task = data["tasks"][task_id]
-    await message.answer("⏳ Audio qabul qilindi. O'qituvchiga yuborilmoqda...")
+    await message.answer("⏳ Audio qabul qilindi. AI tahlil qilmoqda... (30-60 soniya)")
 
+    # 1. Audio faylni yuklab olish
+    try:
+        file = await bot.get_file(message.voice.file_id)
+        file_bytes = await bot.download_file(file.file_path)
+        audio_data = file_bytes.read()
+    except Exception as e:
+        logger.error(f"Audio yuklab olish xatosi: {e}")
+        await message.answer("❌ Audio yuklab olishda xatolik.")
+        await state.clear()
+        return
+
+    # 2. Gemini'ga yuborish (audio → transcript + tahlil)
+    ai_tahlil = "⚠️ AI tahlil qila olmadi."
+    try:
+        audio_part = {
+            "mime_type": "audio/ogg",
+            "data": audio_data,
+        }
+
+        prompt = f"""Sen ingliz tili o'qituvchisisan.
+
+SAVOL: {task['savol']}
+
+Quyidagi audioni tahlil qil:
+
+1. 📝 TRANSCRIPT — o'quvchi aytgan gaplarni so'zma-so'z yoz
+2. ❌ GRAMMAR — grammatik xatolar (xato → to'g'ri)
+3. 📚 VOCABULARY — yaxshiroq so'zlar taklifi
+4. 🔗 COLLOCATIONS — noto'g'ri birikmalar
+5. 📍 PREPOSITIONS — xato predloglar
+6. 🗣 FLUENCY — nutq ravonligi (pauzalar, filler words)
+7. 🧠 CONTENT — savolga to'liq javob berilganmi
+8. ✨ IMPROVED VERSION — yaxshilangan to'liq javob
+9. 🎯 TAVSIYA — 3-5 ta maslahat
+
+O'zbek tilida yoz. Qisqa va aniq."""
+
+        response = gemini_model.generate_content([prompt, audio_part])
+        ai_tahlil = response.text
+    except Exception as e:
+        logger.error(f"Gemini xatosi: {e}")
+        ai_tahlil = f"⚠️ AI xatosi: {e}"
+
+    # 3. Saqlash
     if task_id not in data["submissions"]:
         data["submissions"][task_id] = {}
 
@@ -441,23 +454,44 @@ async def audio_qabul(message: types.Message, state: FSMContext):
         "audio_file_id": message.voice.file_id,
         "submitted_at": now_str(),
         "status": "pending",
+        "ai_tahlil": ai_tahlil,
     }
     save_data(data)
 
     ism = data["students"][user_id].get("ism", "Nomalum")
     guruh = data["students"][user_id].get("guruh", "—")
 
+    # 4. O'quvchiga AI tahlilni yuborish
+    header = "🤖 AI SPEAKING TAHLILI\n\n"
+    full_text = header + ai_tahlil
+
+    if len(full_text) > 4000:
+        for i in range(0, len(full_text), 4000):
+            await message.answer(full_text[i:i+4000])
+    else:
+        await message.answer(full_text)
+
+    # 5. Adminga yuborish
     try:
         await bot.send_message(
             ADMIN_ID,
-            f"📥 YANGI AUDIO!\n\n👤 {ism} ({guruh})\n📚 Vazifa: {task['nomi']}\n⏰ {now_str()}",
+            f"📥 YANGI AUDIO!\n\n👤 {ism} ({guruh})\n📚 Vazifa: {task['nomi']}\n⏰ {now_str()}\n\n"
+            f"🤖 AI tahlil qildi. O'quvchi natijani oldi.",
         )
         await bot.send_voice(ADMIN_ID, message.voice.file_id)
+
+        # AI tahlilni adminga ham yuborish
+        admin_text = f"🤖 AI TAHLIL ({ism}):\n\n{ai_tahlil}"
+        if len(admin_text) > 4000:
+            for i in range(0, len(admin_text), 4000):
+                await bot.send_message(ADMIN_ID, admin_text[i:i+4000])
+        else:
+            await bot.send_message(ADMIN_ID, admin_text)
     except Exception as e:
         logger.error(f"Admin xabari xatosi: {e}")
 
     await message.answer(
-        "✅ Audio yuborildi!\n\n📌 O'qituvchi tekshirib, ball beradi.",
+        "✅ Audio va AI tahlil yuborildi!\n\n📌 O'qituvchi tekshirib, ball beradi.",
         reply_markup=oquvchi_menu(),
     )
     await state.clear()
@@ -564,6 +598,18 @@ async def profilim(message: types.Message):
         f"👤 Profilingiz:\n\nIsm: {s.get('ism')}\nGuruh: {s.get('guruh')}\n"
         f"Ro'yxatdan o'tgan: {s.get('registered')}"
     )
+
+
+# ==================== TEST ====================
+@dp.message(Command("test"))
+async def test_gemini(message: types.Message):
+    if not is_admin(message.from_user.id):
+        return
+    try:
+        response = gemini_model.generate_content("Salom, sen ishlaysanmi? Qisqa javob ber.")
+        await message.answer(f"✅ Gemini ishlayapti:\n\n{response.text}")
+    except Exception as e:
+        await message.answer(f"❌ Gemini xatosi:\n\n{e}")
 
 
 # ==================== WEB SERVER ====================
