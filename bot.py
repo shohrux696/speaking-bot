@@ -6,6 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiohttp import web
 
+# Token va admin ID
 TOKEN = "8722732480:AAHJxkxpT3lbw0NrZuCZTij3EXMFBfxMR0s"
 ADMIN_ID = 8404832881
 
@@ -31,8 +32,12 @@ def asosiy_menu():
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
     user_id = message.from_user.id
+
     if user_id == ADMIN_ID:
-        await message.answer("👨‍🏫 Salom, teacher!", reply_markup=asosiy_menu())
+        await message.answer(
+            "👨‍🏫 Salom, teacher!",
+            reply_markup=asosiy_menu()
+        )
     else:
         await message.answer(
             f"👋 Salom, {message.from_user.full_name}!\n\n"
@@ -61,6 +66,11 @@ async def profilim(message: types.Message):
     await message.answer(f"👤 {message.from_user.full_name}")
 
 
+@dp.message(Command("id"))
+async def show_id(message: types.Message):
+    await message.answer(f"🆔 Sizning Telegram ID: {message.from_user.id}")
+
+
 async def handle(request):
     return web.Response(text="🤖 Bot ishlayapti!")
 
@@ -68,16 +78,19 @@ async def handle(request):
 async def web_server():
     app = web.Application()
     app.router.add_get("/", handle)
+
     runner = web.AppRunner(app)
     await runner.setup()
+
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    logger.info(f"Web server {port}-portda ishga tushdi.")
+
+    logger.info(f"✅ Web server {port}-portda ishga tushdi.")
 
 
 async def main():
-    logger.info("Bot ishga tushmoqda...")
+    logger.info("🚀 Bot ishga tushmoqda...")
     asyncio.create_task(web_server())
     await dp.start_polling(bot)
 
