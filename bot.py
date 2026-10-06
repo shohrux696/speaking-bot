@@ -13,9 +13,9 @@ from aiohttp import web
 import google.generativeai as genai
 
 # ==================== SOZLAMALAR ====================
-TOKEN = "8722732480:AAHJxkxpT3lbw0NrZuCZTij3EXMFBfxMR0s"
-ADMIN_ID = 8404832881
-GEMINI_API_KEY = "AQ.Ab8RN6INx3e3k3zQi-M_n631xNrDnJaqhjpJXnxXcrpMDQmxzg"
+TOKEN = os.environ.get("TOKEN", "")
+ADMIN_ID = int(os.environ.get("ADMIN_ID", "8404832881"))
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
