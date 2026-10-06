@@ -10,8 +10,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
-TOKEN = "8722732480:AAHJxkxpT3lbw0NrZuCZTij3EXMFBfxMR0s"
-ADMIN_ID = 8404832881
+# Load from environment variables
+TOKEN = os.getenv("BOT_TOKEN", "")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+
+if not TOKEN:
+    raise ValueError("BOT_TOKEN environment variable is required!")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,11 +28,9 @@ DEFAULT_DATA = {
     "submissions": {},
 }
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
-
 
 def load_data():
+    """Load data from JSON file with error handling"""
     if not os.path.exists(DATA_FILE):
         return json.loads(json.dumps(DEFAULT_DATA))
     try:
@@ -39,10 +41,12 @@ def load_data():
                 data[key] = value.copy() if isinstance(value, dict) else value
         return data
     except (json.JSONDecodeError, OSError):
+        logger.warning(f"Error reading {DATA_FILE}, using default data")
         return json.loads(json.dumps(DEFAULT_DATA))
 
 
 def save_data(data):
+    """Save data to JSON file with error handling"""
     try:
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -51,15 +55,18 @@ def save_data(data):
 
 
 def is_admin(user_id):
+    """Check if user is admin"""
     return user_id == ADMIN_ID
 
 
 class Royxat(StatesGroup):
+    """Registration states"""
     ism = State()
     guruh = State()
 
 
 def oquvchi_menu():
+    """Student menu"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📚 Vazifalar")],
@@ -72,6 +79,7 @@ def oquvchi_menu():
 
 
 def admin_menu():
+    """Admin menu"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📚 Vazifa berish")],
@@ -82,8 +90,13 @@ def admin_menu():
     )
 
 
+bot = Bot(token=TOKEN)
+dp = Dispatcher(storage=MemoryStorage())
+
+
 @dp.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
+    """Handle /start command"""
     await state.clear()
     user_id = message.from_user.id
 
@@ -115,6 +128,7 @@ async def start_handler(message: types.Message, state: FSMContext):
 
 @dp.message(Royxat.ism)
 async def royxat_ism(message: types.Message, state: FSMContext):
+    """Handle name registration"""
     if not message.text:
         await message.answer("Ism va familiyangizni matn ko'rinishida yozing:")
         return
@@ -129,6 +143,7 @@ async def royxat_ism(message: types.Message, state: FSMContext):
 
 @dp.message(Royxat.guruh)
 async def royxat_guruh(message: types.Message, state: FSMContext):
+    """Handle group registration"""
     if not message.text:
         await message.answer("Guruh nomini yozing:")
         return
@@ -167,6 +182,7 @@ async def royxat_guruh(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "📚 Vazifalar")
 async def vazifalar(message: types.Message):
+    """Show tasks for students"""
     if is_admin(message.from_user.id):
         return
     await message.answer("📚 Hozircha vazifalar yo'q.")
@@ -174,6 +190,7 @@ async def vazifalar(message: types.Message):
 
 @dp.message(F.text == "📊 Natijam")
 async def natijam(message: types.Message):
+    """Show student results"""
     if is_admin(message.from_user.id):
         return
     user_id = str(message.from_user.id)
@@ -192,6 +209,7 @@ async def natijam(message: types.Message):
 
 @dp.message(F.text == "🏆 Ranking")
 async def ranking(message: types.Message):
+    """Show ranking"""
     if is_admin(message.from_user.id):
         return
     await message.answer("🏆 Ranking: #1")
@@ -199,6 +217,7 @@ async def ranking(message: types.Message):
 
 @dp.message(F.text == "👤 Profilim")
 async def profilim(message: types.Message):
+    """Show user profile"""
     if is_admin(message.from_user.id):
         return
     user_id = str(message.from_user.id)
@@ -217,6 +236,7 @@ async def profilim(message: types.Message):
 
 @dp.message(F.text == "👥 O'quvchilar")
 async def oquvchilar(message: types.Message):
+    """Show all students (admin only)"""
     if not is_admin(message.from_user.id):
         return
     data = load_data()
@@ -231,6 +251,7 @@ async def oquvchilar(message: types.Message):
 
 @dp.message(F.text == "📊 Statistika")
 async def statistika(message: types.Message):
+    """Show statistics (admin only)"""
     if not is_admin(message.from_user.id):
         return
     data = load_data()
@@ -241,22 +262,42 @@ async def statistika(message: types.Message):
     )
 
 
+@dp.message(F.text == "📚 Vazifa berish")
+async def vazifa_berish(message: types.Message):
+    """Admin task assignment (placeholder)"""
+    if not is_admin(message.from_user.id):
+        return
+    await message.answer("📚 Vazifa berish funksiyasi hozircha tayyorlanmoqda.")
+
+
+@dp.message(Command("id"))
+async def show_id(message: types.Message):
+    """Show user ID"""
+    await message.answer(f"🆔 Sizning Telegram ID: {message.from_user.id}")
+
+
 async def handle(request):
+    """Handle web requests"""
     return web.Response(text="🤖 Bot ishlayapti!")
 
 
 async def web_server():
+    """Start web server"""
     app = web.Application()
     app.router.add_get("/", handle)
+
     runner = web.AppRunner(app)
     await runner.setup()
+
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
+
     logger.info(f"Web server {port}-portda ishga tushdi.")
 
 
 async def main():
+    """Main function"""
     logger.info("Bot ishga tushmoqda...")
     asyncio.create_task(web_server())
     await dp.start_polling(bot)
