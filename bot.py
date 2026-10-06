@@ -11,11 +11,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 
 # Load from environment variables
-TOKEN = os.getenv("BOT_TOKEN", "")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-
-if not TOKEN:
-    raise ValueError("BOT_TOKEN environment variable is required!")
+TOKEN = os.getenv("8722732480:AAHJxkxpT3lbw0NrZuCZTij3EXMFBfxMR0s", "")
+ADMIN_ID = int(os.getenv("8404832881", "0"))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
