@@ -438,6 +438,7 @@ Quyidagi audioni tahlil qil:
 8. ✨ IMPROVED VERSION — yaxshilangan to'liq javob
 9. 🎯 TAVSIYA — 3-5 ta maslahat
 
+MUHIM: Markdown belgilar ishlatma (*, _, #, `). Faqat emoji va oddiy matn ishlatilsin.
 O'zbek tilida yoz. Qisqa va aniq."""
 
         response = gemini_model.generate_content([prompt, audio_part])
