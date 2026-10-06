@@ -15,12 +15,12 @@ from groq import Groq
 # ==================== SOZLAMALAR ====================
 TOKEN = os.environ.get("TOKEN", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "8404832881"))
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 DATA_FILE = "data.json"
 
@@ -402,7 +402,6 @@ async def audio_qabul(message: types.Message, state: FSMContext):
     task = data["tasks"][task_id]
     await message.answer("⏳ Audio qabul qilindi. AI tahlil qilmoqda... (30-60 soniya)")
 
-    # 1. Audio faylni yuklab olish
     try:
         file = await bot.get_file(message.voice.file_id)
         file_bytes = await bot.download_file(file.file_path)
@@ -413,14 +412,8 @@ async def audio_qabul(message: types.Message, state: FSMContext):
         await state.clear()
         return
 
-    # 2. Gemini'ga yuborish (audio → transcript + tahlil)
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     try:
-        audio_part = {
-            "mime_type": "audio/ogg",
-            "data": audio_data,
-        }
-
         prompt = f"""Sen ingliz tili o'qituvchisisan.
 
 SAVOL: {task['savol']}
@@ -437,23 +430,22 @@ Quyidagi audioni tahlil qil:
 8. ✨ IMPROVED VERSION — yaxshilangan to'liq javob
 9. 🎯 TAVSIYA — 3-5 ta maslahat
 
-MUHIM: Markdown belgilar ishlatma (*, _, #, `). Faqat emoji va oddiy matn ishlatilsin.
+MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
 O'zbek tilida yoz. Qisqa va aniq."""
 
-       tr = groq_client.audio.transcriptions.create(
-    file=("audio.ogg", audio_data),
-    model="whisper-large-v3-turbo",
-)
-response = groq_client.chat.completions.create(
-    model="llama-3.1-8b-instant",
-    messages=[{"role": "user", "content": f"{prompt}\n\nO'quvchi javobi:\n{tr.text}"}],
-)
-ai_tahlil = response.choices[0].message.content
+        tr = groq_client.audio.transcriptions.create(
+            file=("audio.ogg", audio_data),
+            model="whisper-large-v3-turbo",
+        )
+        response = groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": f"{prompt}\n\nO'quvchi javobi:\n{tr.text}"}],
+        )
+        ai_tahlil = response.choices[0].message.content
     except Exception as e:
-        logger.error(f"Gemini xatosi: {e}")
+        logger.error(f"Groq xatosi: {e}")
         ai_tahlil = f"⚠️ AI xatosi: {e}"
 
-    # 3. Saqlash
     if task_id not in data["submissions"]:
         data["submissions"][task_id] = {}
 
@@ -468,7 +460,6 @@ ai_tahlil = response.choices[0].message.content
     ism = data["students"][user_id].get("ism", "Nomalum")
     guruh = data["students"][user_id].get("guruh", "—")
 
-    # 4. O'quvchiga AI tahlilni yuborish
     header = "🤖 AI SPEAKING TAHLILI\n\n"
     full_text = header + ai_tahlil
 
@@ -478,12 +469,11 @@ ai_tahlil = response.choices[0].message.content
     else:
         await message.answer(full_text)
 
-    # 5. Adminga yuborish
     try:
         await bot.send_message(
             ADMIN_ID,
             f"📥 YANGI AUDIO!\n\n👤 {ism} ({guruh})\n📚 Vazifa: {task['nomi']}\n⏰ {now_str()}\n\n"
-            f"🤖 AI tahlil qildi. O'quvchi natijani oldi.",
+            f"🤖 AI tahlil qildi.",
         )
         await bot.send_voice(ADMIN_ID, message.voice.file_id)
 
@@ -608,14 +598,17 @@ async def profilim(message: types.Message):
 
 # ==================== TEST ====================
 @dp.message(Command("test"))
-async def test_gemini(message: types.Message):
+async def test_groq(message: types.Message):
     if not is_admin(message.from_user.id):
         return
     try:
-        response = gemini_model.generate_content("Salom, sen ishlaysanmi? Qisqa javob ber.")
-        await message.answer(f"✅ Gemini ishlayapti:\n\n{response.text}")
+        response = groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
+        )
+        await message.answer(f"✅ Groq ishlayapti:\n\n{response.choices[0].message.content}")
     except Exception as e:
-        await message.answer(f"❌ Gemini xatosi:\n\n{e}")
+        await message.answer(f"❌ Groq xatosi:\n\n{e}")
 
 
 # ==================== WEB SERVER ====================
