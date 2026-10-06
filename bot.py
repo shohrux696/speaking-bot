@@ -438,7 +438,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
             model="whisper-large-v3-turbo",
         )
         response = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+                        model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": f"{prompt}\n\nO'quvchi javobi:\n{tr.text}"}],
         )
         ai_tahlil = response.choices[0].message.content
@@ -603,7 +603,7 @@ async def test_groq(message: types.Message):
         return
     try:
         response = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+                        model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
         )
         await message.answer(f"✅ Groq ishlayapti:\n\n{response.choices[0].message.content}")
