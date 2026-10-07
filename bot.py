@@ -649,9 +649,25 @@ async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
 
 @dp.message(AudioYuborish.vazifa_id, F.text)
 async def audio_vazifa_id(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Ortga":
-        await message.answer("Bekor qilindi.", reply_markup=oquvchi_menu())
+    # Tugmalarni tekshirish
+    tugmalar = [
+        "📝 Vazifani topshirish", "📋 Tugallanmagan vazifalar",
+        "📊 Natijam", "🏆 Ranking", "👤 Profilim",
+        "🔙 Ortga", "✅ Yuborish", "❌ Bekor qilish",
+    ]
+
+    if message.text in tugmalar:
         await state.clear()
+        if message.text == "📝 Vazifani topshirish":
+            await vazifa_topshirish_boshlash(message, state)
+        elif message.text == "📋 Tugallanmagan vazifalar":
+            await tugallanmagan_vazifalar(message)
+        elif message.text == "📊 Natijam":
+            await natijam(message)
+        elif message.text == "🏆 Ranking":
+            await ranking(message)
+        elif message.text == "👤 Profilim":
+            await profilim(message)
         return
 
     task_id = message.text.strip()
@@ -1041,11 +1057,9 @@ async def test_groq(message: types.Message):
 
 # ==================== KUNLIK ESLATMA ====================
 async def daily_reminder():
-    """Har kuni o'quvchilarga tugallanmagan vazifalar haqida eslatma"""
     while True:
         try:
             now = datetime.now()
-            # Har kuni soat 09:00 da
             if now.hour == 9 and now.minute == 0:
                 data = load_data()
                 for uid, info in data["students"].items():
@@ -1077,7 +1091,6 @@ async def daily_reminder():
 
 # ==================== DEADLINE OGOHLANTIRISH ====================
 async def deadline_warning():
-    """Deadline dan oldin 3 marta ogohlantirish (4h, 2h, 1h)"""
     sent_warnings = {}
 
     while True:
@@ -1088,7 +1101,6 @@ async def deadline_warning():
             for tid, task in data["tasks"].items():
                 deadline_str = task.get("deadline", "")
                 try:
-                    # Deadline formatini o'qish
                     deadline = datetime.strptime(deadline_str, "%Y-%m-%d %H:%M")
                 except:
                     continue
@@ -1096,7 +1108,6 @@ async def deadline_warning():
                 time_left = deadline - now
                 hours_left = time_left.total_seconds() / 3600
 
-                # 3 ta ogohlantirish: 4 soat, 2 soat, 1 soat
                 warning_times = [
                     (4, "⏰ 4 soat qoldi!"),
                     (2, "⚠️ 2 soat qoldi!"),
