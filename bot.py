@@ -682,7 +682,7 @@ async def profilim(message: types.Message):
     )
 
 
-# ==================== AI SUHBAT (NVIDIA GLM-5-3-Flash) ====================
+# ==================== AI SUHBAT (NVIDIA GLM-5.3-Flash) ====================
 @dp.message(F.text & ~F.text.startswith('/'))
 async def ai_suhbat(message: types.Message):
     if is_admin(message.from_user.id):
@@ -726,7 +726,7 @@ MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
 O'zbek tilida yoz. Qisqa va aniq."""
 
         response = nim_client.chat.completions.create(
-            model="z-ai/glm-5-3-flash",
+            model="z-ai/glm-5.3-flash",
             messages=[{"role": "user", "content": prompt}],
         )
         ai_javob = response.choices[0].message.content
@@ -761,7 +761,7 @@ async def test_ai(message: types.Message):
     # NVIDIA test
     try:
         response = nim_client.chat.completions.create(
-            model="z-ai/glm-5-3-flash",
+            model="z-ai/glm-5.3-flash",
             messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
         )
         nim_status = f"✅ NVIDIA ishlayapti:\n{response.choices[0].message.content[:200]}"
