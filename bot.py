@@ -11,16 +11,22 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 from groq import Groq
+from openai import OpenAI
 
 # ==================== SOZLAMALAR ====================
 TOKEN = os.environ.get("TOKEN", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "8404832881"))
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 groq_client = Groq(api_key=GROQ_API_KEY)
+nim_client = OpenAI(
+    base_url="https://integrate.api.nvidia.com/v1",
+    api_key=NVIDIA_API_KEY,
+)
 
 DATA_FILE = "data.json"
 
@@ -355,10 +361,8 @@ async def vazifa_ochirish(message: types.Message, state: FSMContext):
 
     task_nomi = data["tasks"][task_id]["nomi"]
 
-    # O'chirish
     del data["tasks"][task_id]
 
-    # Submissionlarni ham o'chirish
     if task_id in data["submissions"]:
         del data["submissions"][task_id]
 
@@ -433,7 +437,6 @@ async def audio_vazifa_id(message: types.Message, state: FSMContext):
         await message.answer("Bunday vazifa topilmadi. Qaytadan yozing:")
         return
 
-    # KETMA-KETLIKNI TEKSHIRISH
     tasks = sorted(data["tasks"].items(), key=lambda x: int(x[0]))
     for tid, task in tasks:
         if tid == task_id:
@@ -679,7 +682,7 @@ async def profilim(message: types.Message):
     )
 
 
-# ==================== AI SUHBAT ====================
+# ==================== AI SUHBAT (NVIDIA GLM-5-3-Flash) ====================
 @dp.message(F.text & ~F.text.startswith('/'))
 async def ai_suhbat(message: types.Message):
     if is_admin(message.from_user.id):
@@ -722,8 +725,8 @@ Quyidagilarni bajar:
 MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
 O'zbek tilida yoz. Qisqa va aniq."""
 
-        response = groq_client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+        response = nim_client.chat.completions.create(
+            model="z-ai/glm-5-3-flash",
             messages=[{"role": "user", "content": prompt}],
         )
         ai_javob = response.choices[0].message.content
@@ -741,17 +744,31 @@ O'zbek tilida yoz. Qisqa va aniq."""
 
 # ==================== TEST ====================
 @dp.message(Command("test"))
-async def test_groq(message: types.Message):
+async def test_ai(message: types.Message):
     if not is_admin(message.from_user.id):
         return
+
+    # Groq test
     try:
         response = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
         )
-        await message.answer(f"✅ Groq ishlayapti:\n\n{response.choices[0].message.content}")
+        groq_status = f"✅ Groq ishlayapti:\n{response.choices[0].message.content[:200]}"
     except Exception as e:
-        await message.answer(f"❌ Groq xatosi:\n\n{e}")
+        groq_status = f"❌ Groq xatosi: {e}"
+
+    # NVIDIA test
+    try:
+        response = nim_client.chat.completions.create(
+            model="z-ai/glm-5-3-flash",
+            messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
+        )
+        nim_status = f"✅ NVIDIA ishlayapti:\n{response.choices[0].message.content[:200]}"
+    except Exception as e:
+        nim_status = f"❌ NVIDIA xatosi: {e}"
+
+    await message.answer(f"{groq_status}\n\n{nim_status}")
 
 
 # ==================== WEB SERVER ====================
