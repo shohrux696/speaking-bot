@@ -868,4 +868,150 @@ async def admin_statistika(message: types.Message):
         f"👥 O'quvchilar: {total_students}\n"
         f"⏳ Kutilayotgan: {total_pending}\n"
         f"📚 Vazifalar: {total_tasks}\n"
-        f"
+        f"📥 Javoblar: {total_subs}\n"
+    )
+    await message.answer(text)
+
+
+# ==================== O'QUVCHI: NATIJA, RANKING, PROFIL ====================
+@dp.message(F.text == "📊 Natijam")
+async def natijam(message: types.Message):
+    if is_admin(message.from_user.id):
+        return
+    user_id = str(message.from_user.id)
+    data = load_data()
+    if user_id not in data["students"]:
+        await message.answer("Avval /start bosing.")
+        return
+    s = data["students"][user_id]
+    total_subs = sum(1 for tid, subs in data["submissions"].items() if user_id in subs)
+
+    await message.answer(
+        f"📊 Natijangiz:\n\n👤 {s.get('ism')}\n🏫 {s.get('guruh')}\n"
+        f"📚 Topshirilgan: {total_subs}\n💰 Ball: {s.get('ball', 0)}"
+    )
+
+
+@dp.message(F.text == "🏆 Ranking")
+async def ranking(message: types.Message):
+    if is_admin(message.from_user.id):
+        return
+    await message.answer("🏆 Ranking tez orada qo'shiladi.")
+
+
+@dp.message(F.text == "👤 Profilim")
+async def profilim(message: types.Message):
+    if is_admin(message.from_user.id):
+        return
+    user_id = str(message.from_user.id)
+    data = load_data()
+    if user_id not in data["students"]:
+        await message.answer("Avval /start bosing.")
+        return
+    s = data["students"][user_id]
+    await message.answer(
+        f"👤 Profilingiz:\n\nIsm: {s.get('ism')}\nGuruh: {s.get('guruh')}\n"
+        f"Ro'yxatdan o'tgan: {s.get('registered')}\n💰 Ball: {s.get('ball', 0)}"
+    )
+
+
+# ==================== AI SUHBAT ====================
+@dp.message(F.text & ~F.text.startswith('/'))
+async def ai_suhbat(message: types.Message):
+    if is_admin(message.from_user.id):
+        return
+
+    tugmalar = [
+        "📚 Vazifalar", "📊 Natijam", "🏆 Ranking", "👤 Profilim",
+        "📚 Vazifa berish", "📥 Kelgan javoblar", "👥 O'quvchilar", "📊 Statistika",
+        "🗑 Vazifani o'chirish", "🎯 Baholash",
+        "🔙 Ortga", "✅ Yuborish", "❌ Bekor qilish",
+        "✅ To'liq (1 ball)", "⚠️ Chala (0.5 ball)", "❌ Bajarilmagan (0 ball)",
+    ]
+
+    if message.text in tugmalar:
+        return
+
+    user_id = str(message.from_user.id)
+    data = load_data()
+
+    if user_id not in data["students"]:
+        return
+
+    if not message.text or len(message.text) < 3:
+        return
+
+    await message.answer("🤔 O'ylayapman...")
+
+    try:
+        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi senga savol berdi:
+
+SAVOL: {message.text}
+
+Quyidagilarni bajar:
+
+1. 📝 SAVOLGA JAVOB — qisqa va aniq javob ber
+2. 💡 IDEALAR — 3-4 ta fikr taklif qil (ingliz tilida)
+3. 📚 YANGI SO'ZLAR — 3-5 ta foydali so'z va ibora (tarjimasi bilan)
+4. ❓ QO'SHIMCHA SAVOL — o'quvchiga qo'shimcha savol ber (ingliz tilida)
+5. ✅ TUSHUNARLI — barchasi oddiy va tushunarli tilda yozilgan
+
+MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
+O'zbek tilida yoz. Qisqa va aniq."""
+
+        response = groq_client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        ai_javob = response.choices[0].message.content
+
+        if len(ai_javob) > 4000:
+            for i in range(0, len(ai_javob), 4000):
+                await message.answer(ai_javob[i:i+4000])
+        else:
+            await message.answer(f"🤖 AI JAVOBI:\n\n{ai_javob}")
+
+    except Exception as e:
+        logger.error(f"AI suhbat xatosi: {e}")
+        await message.answer(f"⚠️ Xatolik: {e}")
+
+
+# ==================== TEST ====================
+@dp.message(Command("test"))
+async def test_groq(message: types.Message):
+    if not is_admin(message.from_user.id):
+        return
+    try:
+        response = groq_client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
+        )
+        await message.answer(f"✅ Groq ishlayapti:\n\n{response.choices[0].message.content}")
+    except Exception as e:
+        await message.answer(f"❌ Groq xatosi:\n\n{e}")
+
+
+# ==================== WEB SERVER ====================
+async def handle(request):
+    return web.Response(text="🤖 Speaking Bot ishlayapti!")
+
+
+async def web_server():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logger.info(f"Web server {port}-portda ishga tushdi.")
+
+
+async def main():
+    logger.info("Bot ishga tushmoqda...")
+    asyncio.create_task(web_server())
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
