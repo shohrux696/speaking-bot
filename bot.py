@@ -704,35 +704,67 @@ async def audio_qabul(message: types.Message, state: FSMContext):
 
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     try:
-        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi speaking topshirig'ini bajardi.
+        prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
+O'quvchi speaking topshirig'ini bajardi.
 
 SAVOL: {task['savol']}
 
-Quyidagi audioni tahlil qil:
+Quyidagi audioni TO'LIQ va TABIIY tahlil qil. Har bir bo'limda emoji ishlatilsin.
+O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
 
-1. 📝 TRANSCRIPT — o'quvchi aytgan gaplarni so'zma-so'z yoz
-2. 📊 BAHO — 0 dan 100 gacha aniq foizda ber (masalan: 73%, 85%):
-   - Accuracy (aniqlik): X%
-   - Vocabulary (so'z boyligi): X%
-   - Fluency (ravonlik): X%
-   - Grammar (grammatika): X%
-   - Pronunciation (talaffuz): X%
-   - Overall (umumiy): X%
-3. 📝 IZOH — nega shunday baho berganingizni tushuntiring:
-   - Nima yaxshi (✅)
-   - Nima o'rtacha (⚠️)
-   - Nima yomon (❌)
-4. ❌ GRAMMAR — grammatik xatolar (xato → to'g'ri)
-5. 📚 VOCABULARY — yaxshiroq so'zlar taklifi
-6. 🔗 COLLOCATIONS — noto'g'ri birikmalar
-7. 📍 PREPOSITIONS — xato predloglar
-8. 🗣 FLUENCY — nutq ravonligi (pauzalar, filler words)
-9. 🧠 CONTENT — savolga to'liq javob berilganmi
-10. ✨ IMPROVED VERSION — yaxshilangan to'liq javob
-11. 🎯 TAVSIYA — 3-5 ta maslahat
+1. 📝 TRANSCRIPT
+O'quvchi aytgan gaplarni so'zma-so'z yoz.
 
-MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
-O'zbek tilida yoz. Qisqa va aniq."""
+2. 📊 BAHO
+Har bir mezon uchun foizda baho ber:
+🎯 Accuracy (aniqlik): X%
+📚 Vocabulary (so'z boyligi): X%
+🗣 Fluency (ravonlik): X%
+📖 Grammar (grammatika): X%
+🔊 Pronunciation (talaffuz): X%
+⭐ Overall (umumiy): X%
+
+3. 📝 IZOH
+✅ Kuchli tomonlar
+⚠️ O'rtacha tomonlar
+❌ Zaif tomonlar
+
+4. ❌ GRAMMAR XATOLARI
+Har bir xatoni ko'rsat:
+❌ Xato: [xato gap]
+✅ To'g'ri: [to'g'ri gap]
+💡 Izoh: [nega xato]
+
+5. 📚 VOCABULARY TAKLIFLARI
+🔄 [oddiy so'z] → [kuchli so'z]
+💡 Misol: [misol gap]
+
+6. 🔗 COLLOCATIONS
+✅ [to'g'ri birikma]
+❌ [noto'g'ri birikma]
+💡 Izoh
+
+7. 📍 PREPOSITIONS
+❌ [xato] → ✅ [to'g'ri]
+
+8. 🗣 FLUENCY
+Pauzalar, filler words, ravonlik.
+💡 Tavsiya
+
+9. 🧠 CONTENT & COHERENCE
+Savolga to'liq javob berilganmi?
+
+10. ✨ IMPROVED VERSION
+O'quvchining javobini TO'LIQ va TABIIY qilib qayta yoz.
+
+11. 🎯 NAMUNA JAVOB (SAMPLE ANSWER)
+Shu savolga IELTS 8+ darajadagi TO'LIQ NAMUNA javob yoz.
+
+12. 💡 TAVSIYA
+3-5 ta maslahat.
+
+MUHIM: Har bir bo'lim oldiga emoji qo'y. Markdown belgilar (*, _, #) ishlatma.
+O'zbek tilida yoz, misollar ingliz tilida. Qisqa va aniq."""
 
         tr = groq_client.audio.transcriptions.create(
             file=("audio.ogg", audio_data),
@@ -937,20 +969,51 @@ async def ai_suhbat(message: types.Message):
     await message.answer("🤔 O'ylayapman...")
 
     try:
-        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi senga savol berdi:
+        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi senga savol berdi.
 
 SAVOL: {message.text}
 
-Quyidagilarni bajar:
+Quyidagi TO'LIQ yordamni ber. Har bir bo'limda emoji ishlatilsin.
+O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
 
-1. 📝 SAVOLGA JAVOB — qisqa va aniq javob ber
-2. 💡 IDEALAR — 3-4 ta fikr taklif qil (ingliz tilida)
-3. 📚 YANGI SO'ZLAR — 3-5 ta foydali so'z va ibora (tarjimasi bilan)
-4. ❓ QO'SHIMCHA SAVOL — o'quvchiga qo'shimcha savol ber (ingliz tilida)
-5. ✅ TUSHUNARLI — barchasi oddiy va tushunarli tilda yozilgan
+1. 📝 TO'LIQ JAVOB
+Savolga to'liq va aniq javob ber.
 
-MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
-O'zbek tilida yoz. Qisqa va aniq."""
+2. 💡 IDEALAR (FIKRLAR)
+Savolga javob berish uchun 4-5 ta fikr taklif qil:
+💡 Idea 1: [fikr ingliz tilida]
+💡 Idea 2: [fikr ingliz tilida]
+...
+
+3. 📚 YANGI SO'ZLAR (VOCABULARY)
+Savolga mos 5-7 ta foydali so'z va ibora:
+📖 [so'z] — [tarjimasi]
+💡 Misol: [misol gap]
+
+4. 🔗 COLLOCATIONS
+Savolga mos to'g'ri so'z birikmalari:
+✅ [birikma]
+💡 Misol: [misol gap]
+
+5. 📝 GRAMMAR
+Savolga javob berishda ishlatiladigan grammatik qoidalar:
+📖 [qoida]
+💡 Misol: [misol]
+
+6. ❓ QO'SHIMCHA SAVOLLAR
+O'quvchi bilan davom etish uchun 2-3 ta savol:
+❓ [savol ingliz tilida]
+❓ [savol ingliz tilida]
+
+7. 🎯 NAMUNA JAVOB (SAMPLE ANSWER)
+Shu savolga TO'LIQ va TABIIY namuna javob yoz (IELTS 8+ darajada):
+[to'liq javob ingliz tilida]
+
+8. ✅ TUSHUNARLI
+Barchasi oddiy va tushunarli tilda yozilgan.
+
+MUHIM: Har bir bo'lim oldiga emoji qo'y. Markdown belgilar (*, _, #) ishlatma.
+O'zbek tilida yoz, misollar ingliz tilida. Qisqa va aniq."""
 
         response = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
