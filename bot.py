@@ -11,27 +11,22 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 from groq import Groq
-from openai import OpenAI
 
 # ==================== SOZLAMALAR ====================
 TOKEN = os.environ.get("TOKEN", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "8404832881"))
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 groq_client = Groq(api_key=GROQ_API_KEY)
-nim_client = OpenAI(
-    base_url="https://integrate.api.nvidia.com/v1",
-    api_key=NVIDIA_API_KEY,
-)
 
 DATA_FILE = "data.json"
 
 DEFAULT_DATA = {
     "students": {},
+    "pending_students": {},
     "tasks": {},
     "submissions": {},
 }
@@ -91,6 +86,10 @@ class VazifaOchirish(StatesGroup):
     vazifa_id = State()
 
 
+class Baholash(StatesGroup):
+    user_id = State()
+
+
 # ==================== MENYULAR ====================
 def oquvchi_menu():
     return ReplyKeyboardMarkup(
@@ -109,6 +108,7 @@ def admin_menu():
         keyboard=[
             [KeyboardButton(text="📚 Vazifa berish")],
             [KeyboardButton(text="📥 Kelgan javoblar")],
+            [KeyboardButton(text="🎯 Baholash")],
             [KeyboardButton(text="👥 O'quvchilar")],
             [KeyboardButton(text="📊 Statistika")],
             [KeyboardButton(text="🗑 Vazifani o'chirish")],
@@ -134,6 +134,18 @@ def ortga_menu():
     )
 
 
+def baholash_menu():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="✅ To'liq (1 ball)")],
+            [KeyboardButton(text="⚠️ Chala (0.5 ball)")],
+            [KeyboardButton(text="❌ Bajarilmagan (0 ball)")],
+            [KeyboardButton(text="🔙 Ortga")],
+        ],
+        resize_keyboard=True,
+    )
+
+
 # ==================== START ====================
 @dp.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
@@ -153,6 +165,10 @@ async def start_handler(message: types.Message, state: FSMContext):
             f"Salom, {student['ism']}!\n\n🏫 Guruh: {student['guruh']}",
             reply_markup=oquvchi_menu(),
         )
+        return
+
+    if user_id_str in data["pending_students"]:
+        await message.answer("⏳ Sizning so'rovingiz admin tasdiqlashini kutmoqda.")
         return
 
     await message.answer(
@@ -191,28 +207,117 @@ async def royxat_guruh(message: types.Message, state: FSMContext):
     user_id = str(message.from_user.id)
 
     data = load_data()
-    data["students"][user_id] = {
+
+    # PENDING ga qo'shish (admin tasdiqlashi kerak)
+    data["pending_students"][user_id] = {
         "name": message.from_user.full_name,
         "ism": ism,
         "guruh": guruh,
-        "ball": 0,
         "registered": now_str(),
     }
     save_data(data)
 
+    # Adminga tasdiqlash tugmalari bilan xabar
     try:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve_{user_id}"),
+                InlineKeyboardButton(text="❌ Rad etish", callback_data=f"reject_{user_id}"),
+            ]
+        ])
         await bot.send_message(
             ADMIN_ID,
-            f"🆕 Yangi o'quvchi!\n👤 {ism}\n🏫 {guruh}\n🆔 {user_id}",
+            f"🆕 YANGI RO'YXATDAN O'TISH SO'ROVI!\n\n"
+            f"👤 Ism: {ism}\n"
+            f"🏫 Guruh: {guruh}\n"
+            f"📱 Telegram: {message.from_user.full_name}\n"
+            f"🆔 ID: {user_id}\n\n"
+            f"Tasdiqlaysizmi?",
+            reply_markup=kb,
         )
     except Exception as e:
         logger.error(f"Admin xabari xatosi: {e}")
 
     await message.answer(
-        f"✅ Ro'yxatdan o'tdingiz!\n👤 {ism}\n🏫 {guruh}",
-        reply_markup=oquvchi_menu(),
+        "⏳ So'rovingiz adminga yuborildi.\n\n"
+        "Admin tasdiqlagandan keyin botdan foydalanishingiz mumkin.",
     )
     await state.clear()
+
+
+# ==================== ADMIN: TASDIQLASH / RAD ETISH ====================
+@dp.callback_query(F.data.startswith("approve_"))
+async def approve_student(callback: types.CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Siz admin emassiz!")
+        return
+
+    user_id = callback.data.replace("approve_", "")
+    data = load_data()
+
+    if user_id not in data["pending_students"]:
+        await callback.answer("Bu o'quvchi allaqachon tasdiqlangan.")
+        return
+
+    student = data["pending_students"][user_id]
+    data["students"][user_id] = {
+        "name": student.get("name", ""),
+        "ism": student.get("ism", "Nomalum"),
+        "guruh": student.get("guruh", "—"),
+        "ball": 0,
+        "registered": now_str(),
+    }
+    del data["pending_students"][user_id]
+    save_data(data)
+
+    # O'quvchiga xabar
+    try:
+        await bot.send_message(
+            int(user_id),
+            f"✅ Sizning so'rovingiz tasdiqlandi!\n\n"
+            f"👤 {student['ism']}\n"
+            f"🏫 {student['guruh']}\n\n"
+            f"Botdan foydalanishingiz mumkin.",
+            reply_markup=oquvchi_menu(),
+        )
+    except Exception as e:
+        logger.error(f"O'quvchiga xabar xatosi: {e}")
+
+    await callback.message.edit_text(
+        f"✅ TASDIQLANDI: {student['ism']} ({student['guruh']})"
+    )
+    await callback.answer("Tasdiqlandi!")
+
+
+@dp.callback_query(F.data.startswith("reject_"))
+async def reject_student(callback: types.CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Siz admin emassiz!")
+        return
+
+    user_id = callback.data.replace("reject_", "")
+    data = load_data()
+
+    if user_id not in data["pending_students"]:
+        await callback.answer("Bu o'quvchi allaqachon tasdiqlangan.")
+        return
+
+    student = data["pending_students"][user_id]
+    del data["pending_students"][user_id]
+    save_data(data)
+
+    try:
+        await bot.send_message(
+            int(user_id),
+            "❌ Sizning so'rovingiz rad etildi.",
+        )
+    except Exception as e:
+        logger.error(f"O'quvchiga xabar xatosi: {e}")
+
+    await callback.message.edit_text(
+        f"❌ RAD ETILDI: {student['ism']} ({student['guruh']})"
+    )
+    await callback.answer("Rad etildi!")
 
 
 # ==================== ADMIN: VAZIFA BERISH ====================
@@ -325,6 +430,121 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
     await state.clear()
 
 
+# ==================== ADMIN: BAHOLASH ====================
+@dp.message(F.text == "🎯 Baholash")
+async def baholash_boshlash(message: types.Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+
+    data = load_data()
+    pending = []
+    for task_id, subs in data["submissions"].items():
+        for uid, sub in subs.items():
+            if sub.get("status") == "pending":
+                task_name = data["tasks"].get(task_id, {}).get("nomi", "Nomalum")
+                student = data["students"].get(uid, {})
+                ism = student.get("ism", "Nomalum")
+                pending.append((uid, ism, task_name))
+
+    if not pending:
+        await message.answer("🎯 Hozircha baholanmagan javoblar yo'q.", reply_markup=admin_menu())
+        return
+
+    text = "🎯 BAHOLASH\n\nQaysi o'quvchini baholaysiz?\n\n"
+    for uid, ism, task_name in pending:
+        text += f"🆔 {uid}\n👤 {ism}\n📚 {task_name}\n\n"
+
+    text += "O'quvchi ID raqamini yozing:"
+    await message.answer(text, reply_markup=ortga_menu())
+    await state.set_state(Baholash.user_id)
+
+
+@dp.message(Baholash.user_id)
+async def baholash_user(message: types.Message, state: FSMContext):
+    if message.text == "🔙 Ortga":
+        await message.answer("Bekor qilindi.", reply_markup=admin_menu())
+        await state.clear()
+        return
+
+    user_id = message.text.strip()
+    data = load_data()
+
+    if user_id not in data["students"]:
+        await message.answer("Bunday o'quvchi topilmadi. Qaytadan yozing:")
+        return
+
+    found = False
+    for task_id, subs in data["submissions"].items():
+        if user_id in subs and subs[user_id].get("status") == "pending":
+            found = True
+            break
+
+    if not found:
+        await message.answer("Bu o'quvchining baholanmagan javobi yo'q.")
+        return
+
+    ism = data["students"][user_id].get("ism", "Nomalum")
+    await state.update_data(user_id=user_id)
+
+    await message.answer(
+        f"👤 {ism}\n\n🎯 Bahoni tanlang:",
+        reply_markup=baholash_menu(),
+    )
+
+
+@dp.message(Baholash.user_id, F.text.in_(["✅ To'liq (1 ball)", "⚠️ Chala (0.5 ball)", "❌ Bajarilmagan (0 ball)"]))
+async def baholash_ball(message: types.Message, state: FSMContext):
+    ball_map = {
+        "✅ To'liq (1 ball)": 1.0,
+        "⚠️ Chala (0.5 ball)": 0.5,
+        "❌ Bajarilmagan (0 ball)": 0.0,
+    }
+
+    ball = ball_map[message.text]
+
+    data_user = await state.get_data()
+    user_id = data_user.get("user_id")
+
+    data = load_data()
+
+    for task_id, subs in data["submissions"].items():
+        if user_id in subs and subs[user_id].get("status") == "pending":
+            subs[user_id]["status"] = "evaluated"
+            subs[user_id]["ball"] = ball
+            subs[user_id]["evaluated_at"] = now_str()
+
+            data["students"][user_id]["ball"] = data["students"][user_id].get("ball", 0) + ball
+
+            save_data(data)
+
+            ism = data["students"][user_id].get("ism", "Nomalum")
+            task_nomi = data["tasks"].get(task_id, {}).get("nomi", "Nomalum")
+
+            await message.answer(
+                f"✅ {ism} baholandi!\n\n"
+                f"📚 Vazifa: {task_nomi}\n"
+                f"💰 Ball: {ball}",
+                reply_markup=admin_menu(),
+            )
+
+            try:
+                await bot.send_message(
+                    int(user_id),
+                    f"🎯 Sizning javobingiz baholandi!\n\n"
+                    f"📚 Vazifa: {task_nomi}\n"
+                    f"💰 Ball: {ball}\n"
+                    f"📊 Umumiy ball: {data['students'][user_id]['ball']}",
+                )
+            except Exception as e:
+                logger.error(f"O'quvchiga xabar xatosi: {e}")
+
+            await state.clear()
+            return
+
+    await message.answer("Xatolik: submission topilmadi.")
+    await state.clear()
+
+
 # ==================== ADMIN: VAZIFANI O'CHIRISH ====================
 @dp.message(F.text == "🗑 Vazifani o'chirish")
 async def vazifa_ochirish_boshlash(message: types.Message, state: FSMContext):
@@ -360,7 +580,6 @@ async def vazifa_ochirish(message: types.Message, state: FSMContext):
         return
 
     task_nomi = data["tasks"][task_id]["nomi"]
-
     del data["tasks"][task_id]
 
     if task_id in data["submissions"]:
@@ -395,7 +614,14 @@ async def oquvchi_vazifalar(message: types.Message):
     text = "📚 VAZIFALAR\n\n"
     for tid, task in data["tasks"].items():
         submitted = data["submissions"].get(tid, {})
-        status = "🟢 Yuborilgan" if user_id in submitted else "🔴 Yuborilmagan"
+        if user_id in submitted:
+            sub = submitted[user_id]
+            if sub.get("status") == "evaluated":
+                status = f"🟢 Baholangan: {sub.get('ball', 0)} ball"
+            else:
+                status = "🟡 Tekshirilmoqda"
+        else:
+            status = "🔴 Yuborilmagan"
         text += f"{tid}. {task['nomi']}\n   {status}\n   ⏰ {task['deadline']}\n\n"
 
     text += "Topshirish uchun /submit buyrug'ini bosing."
@@ -559,7 +785,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
         await bot.send_message(
             ADMIN_ID,
             f"📥 YANGI AUDIO!\n\n👤 {ism} ({guruh})\n📚 Vazifa: {task['nomi']}\n⏰ {now_str()}\n\n"
-            f"🤖 AI tahlil qildi.",
+            f"🤖 AI tahlil qildi. '🎯 Baholash' tugmasi orqali ball qo'ying.",
         )
         await bot.send_voice(ADMIN_ID, message.voice.file_id)
 
@@ -573,7 +799,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
         logger.error(f"Admin xabari xatosi: {e}")
 
     await message.answer(
-        "✅ Audio va AI tahlil yuborildi!\n\n📌 O'qituvchi tekshirib, ball beradi.",
+        "✅ Audio yuborildi!\n\n📌 O'qituvchi baholagandan keyin ball olasiz.",
         reply_markup=oquvchi_menu(),
     )
     await state.clear()
@@ -599,7 +825,7 @@ async def kelgan_javoblar(message: types.Message):
                 student = data["students"].get(uid, {})
                 ism = student.get("ism", "Nomalum")
                 guruh = student.get("guruh", "—")
-                text += f"👤 {ism} ({guruh})\n📚 {task_name}\n⏰ {sub.get('submitted_at')}\n\n"
+                text += f"👤 {ism} ({guruh})\n📚 {task_name}\n🆔 {uid}\n⏰ {sub.get('submitted_at')}\n\n"
                 count += 1
 
     if count == 0:
@@ -621,7 +847,7 @@ async def admin_oquvchilar(message: types.Message):
 
     text = f"👥 O'QUVCHILAR ({len(data['students'])} ta)\n\n"
     for uid, info in data["students"].items():
-        text += f"👤 {info.get('ism')} ({info.get('guruh')})\n"
+        text += f"👤 {info.get('ism')} ({info.get('guruh')})\n💰 {info.get('ball', 0)} ball\n🆔 {uid}\n\n"
 
     await message.answer(text)
 
@@ -633,165 +859,13 @@ async def admin_statistika(message: types.Message):
 
     data = load_data()
     total_students = len(data["students"])
+    total_pending = len(data["pending_students"])
     total_tasks = len(data["tasks"])
     total_subs = sum(len(subs) for subs in data["submissions"].values())
 
-    text = f"📊 STATISTIKA\n\n👥 O'quvchilar: {total_students}\n📚 Vazifalar: {total_tasks}\n📥 Javoblar: {total_subs}\n"
-    await message.answer(text)
-
-
-# ==================== O'QUVCHI: NATIJA, RANKING, PROFIL ====================
-@dp.message(F.text == "📊 Natijam")
-async def natijam(message: types.Message):
-    if is_admin(message.from_user.id):
-        return
-    user_id = str(message.from_user.id)
-    data = load_data()
-    if user_id not in data["students"]:
-        await message.answer("Avval /start bosing.")
-        return
-    s = data["students"][user_id]
-    total_subs = sum(1 for tid, subs in data["submissions"].items() if user_id in subs)
-
-    await message.answer(
-        f"📊 Natijangiz:\n\n👤 {s.get('ism')}\n🏫 {s.get('guruh')}\n"
-        f"📚 Topshirilgan: {total_subs}\n💰 Ball: {s.get('ball', 0)}"
-    )
-
-
-@dp.message(F.text == "🏆 Ranking")
-async def ranking(message: types.Message):
-    if is_admin(message.from_user.id):
-        return
-    await message.answer("🏆 Ranking tez orada qo'shiladi.")
-
-
-@dp.message(F.text == "👤 Profilim")
-async def profilim(message: types.Message):
-    if is_admin(message.from_user.id):
-        return
-    user_id = str(message.from_user.id)
-    data = load_data()
-    if user_id not in data["students"]:
-        await message.answer("Avval /start bosing.")
-        return
-    s = data["students"][user_id]
-    await message.answer(
-        f"👤 Profilingiz:\n\nIsm: {s.get('ism')}\nGuruh: {s.get('guruh')}\n"
-        f"Ro'yxatdan o'tgan: {s.get('registered')}"
-    )
-
-
-# ==================== AI SUHBAT (NVIDIA GLM-5.3-Flash) ====================
-@dp.message(F.text & ~F.text.startswith('/'))
-async def ai_suhbat(message: types.Message):
-    if is_admin(message.from_user.id):
-        return
-
-    tugmalar = [
-        "📚 Vazifalar", "📊 Natijam", "🏆 Ranking", "👤 Profilim",
-        "📚 Vazifa berish", "📥 Kelgan javoblar", "👥 O'quvchilar", "📊 Statistika",
-        "🗑 Vazifani o'chirish",
-        "🔙 Ortga", "✅ Yuborish", "❌ Bekor qilish",
-    ]
-
-    if message.text in tugmalar:
-        return
-
-    user_id = str(message.from_user.id)
-    data = load_data()
-
-    if user_id not in data["students"]:
-        return
-
-    if not message.text or len(message.text) < 3:
-        return
-
-    await message.answer("🤔 O'ylayapman...")
-
-    try:
-        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi senga savol berdi:
-
-SAVOL: {message.text}
-
-Quyidagilarni bajar:
-
-1. 📝 SAVOLGA JAVOB — qisqa va aniq javob ber
-2. 💡 IDEALAR — 3-4 ta fikr taklif qil (ingliz tilida)
-3. 📚 YANGI SO'ZLAR — 3-5 ta foydali so'z va ibora (tarjimasi bilan)
-4. ❓ QO'SHIMCHA SAVOL — o'quvchiga qo'shimcha savol ber (ingliz tilida)
-5. ✅ TUSHUNARLI — barchasi oddiy va tushunarli tilda yozilgan
-
-MUHIM: Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
-O'zbek tilida yoz. Qisqa va aniq."""
-
-        response = nim_client.chat.completions.create(
-            model="z-ai/glm-5.3-flash",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        ai_javob = response.choices[0].message.content
-
-        if len(ai_javob) > 4000:
-            for i in range(0, len(ai_javob), 4000):
-                await message.answer(ai_javob[i:i+4000])
-        else:
-            await message.answer(f"🤖 AI JAVOBI:\n\n{ai_javob}")
-
-    except Exception as e:
-        logger.error(f"AI suhbat xatosi: {e}")
-        await message.answer(f"⚠️ Xatolik: {e}")
-
-
-# ==================== TEST ====================
-@dp.message(Command("test"))
-async def test_ai(message: types.Message):
-    if not is_admin(message.from_user.id):
-        return
-
-    # Groq test
-    try:
-        response = groq_client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
-        )
-        groq_status = f"✅ Groq ishlayapti:\n{response.choices[0].message.content[:200]}"
-    except Exception as e:
-        groq_status = f"❌ Groq xatosi: {e}"
-
-    # NVIDIA test
-    try:
-        response = nim_client.chat.completions.create(
-            model="z-ai/glm-5.3-flash",
-            messages=[{"role": "user", "content": "Salom, sen ishlaysanmi? Qisqa javob ber."}],
-        )
-        nim_status = f"✅ NVIDIA ishlayapti:\n{response.choices[0].message.content[:200]}"
-    except Exception as e:
-        nim_status = f"❌ NVIDIA xatosi: {e}"
-
-    await message.answer(f"{groq_status}\n\n{nim_status}")
-
-
-# ==================== WEB SERVER ====================
-async def handle(request):
-    return web.Response(text="🤖 Speaking Bot ishlayapti!")
-
-
-async def web_server():
-    app = web.Application()
-    app.router.add_get("/", handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 8080))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logger.info(f"Web server {port}-portda ishga tushdi.")
-
-
-async def main():
-    logger.info("Bot ishga tushmoqda...")
-    asyncio.create_task(web_server())
-    await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    text = (
+        f"📊 STATISTIKA\n\n"
+        f"👥 O'quvchilar: {total_students}\n"
+        f"⏳ Kutilayotgan: {total_pending}\n"
+        f"📚 Vazifalar: {total_tasks}\n"
+        f"
