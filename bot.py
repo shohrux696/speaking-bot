@@ -94,7 +94,8 @@ class OquvchiOchirish(StatesGroup):
 def oquvchi_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📚 Vazifalar")],
+            [KeyboardButton(text="📝 Vazifani topshirish")],
+            [KeyboardButton(text="📋 Tugallanmagan vazifalar")],
             [KeyboardButton(text="📊 Natijam")],
             [KeyboardButton(text="🏆 Ranking")],
             [KeyboardButton(text="👤 Profilim")],
@@ -473,7 +474,7 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
             await bot.send_message(
                 int(uid),
                 f"📚 YANGI VAZIFA\n\n📝 {nomi}\n\n❓ {savol}\n\n⏰ Deadline: {deadline}\n\n"
-                f"Topshirish uchun /submit buyrug'ini bosing.",
+                f"Topshirish uchun '📝 Vazifani topshirish' tugmasini bosing.",
             )
             sent += 1
         except Exception as e:
@@ -583,9 +584,9 @@ async def oquvchi_ochirish(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# ==================== O'QUVCHI: VAZIFALAR ====================
-@dp.message(F.text == "📚 Vazifalar")
-async def oquvchi_vazifalar(message: types.Message):
+# ==================== O'QUVCHI: TUGALLANMAGAN VAZIFALAR ====================
+@dp.message(F.text == "📋 Tugallanmagan vazifalar")
+async def tugallanmagan_vazifalar(message: types.Message):
     if is_admin(message.from_user.id):
         return
 
@@ -596,30 +597,28 @@ async def oquvchi_vazifalar(message: types.Message):
         await message.answer("Avval /start bosing.")
         return
 
-    if not data["tasks"]:
-        await message.answer("📚 Hozircha vazifalar yo'q.")
-        return
-
-    text = "📚 VAZIFALAR\n\n"
+    tugallanmagan = []
     for tid, task in data["tasks"].items():
         submitted = data["submissions"].get(tid, {})
-        if user_id in submitted:
-            sub = submitted[user_id]
-            if sub.get("status") == "evaluated":
-                status = f"🟢 Baholangan: {sub.get('ball', 0)} ball"
-            else:
-                status = "🟡 Tekshirilmoqda"
-        else:
-            status = "🔴 Yuborilmagan"
-        text += f"{tid}. {task['nomi']}\n   {status}\n   ⏰ {task['deadline']}\n\n"
+        if user_id not in submitted:
+            tugallanmagan.append((tid, task))
 
-    text += "Topshirish uchun /submit buyrug'ini bosing."
+    if not tugallanmagan:
+        await message.answer("✅ Sizda tugallanmagan vazifalar yo'q!\n\nBarcha vazifalarni topshirgansiz.")
+        return
+
+    text = f"📋 TUGALLANMAGAN VAZIFALAR ({len(tugallanmagan)} ta)\n\n"
+    for tid, task in tugallanmagan:
+        text += f"📚 {tid}. {task['nomi']}\n"
+        text += f"⏰ Deadline: {task['deadline']}\n\n"
+
+    text += "Topshirish uchun '📝 Vazifani topshirish' tugmasini bosing."
     await message.answer(text)
 
 
-# ==================== O'QUVCHI: AUDIO YUBORISH ====================
-@dp.message(Command("submit"))
-async def submit_start(message: types.Message, state: FSMContext):
+# ==================== O'QUVCHI: VAZIFA TOPSHIRISH ====================
+@dp.message(F.text == "📝 Vazifani topshirish")
+async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
     if is_admin(message.from_user.id):
         return
 
@@ -628,9 +627,20 @@ async def submit_start(message: types.Message, state: FSMContext):
         await message.answer("Hozircha vazifalar yo'q.")
         return
 
-    text = "Qaysi vazifaga audio yubormoqchisiz?\n\n"
+    user_id = str(message.from_user.id)
+
+    text = "📝 VAZIFA TOPSHIRISH\n\nQaysi vazifani topshirmoqchisiz?\n\n"
     for tid, task in data["tasks"].items():
-        text += f"{tid}. {task['nomi']}\n"
+        submitted = data["submissions"].get(tid, {})
+        if user_id in submitted:
+            sub = submitted[user_id]
+            if sub.get("status") == "evaluated":
+                status = f"🟢 {sub.get('ball', 0)} ball"
+            else:
+                status = "🟡 Tekshirilmoqda"
+        else:
+            status = "🔴 Yuborilmagan"
+        text += f"{tid}. {task['nomi']} — {status}\n"
 
     text += "\nVazifa raqamini yozing:"
     await message.answer(text)
@@ -679,7 +689,7 @@ async def audio_qabul(message: types.Message, state: FSMContext):
     task_id = data_user.get("task_id")
 
     if not task_id:
-        await message.answer("Vazifa tanlanmagan. /submit bosing.")
+        await message.answer("Vazifa tanlanmagan. '📝 Vazifani topshirish' tugmasini bosing.")
         await state.clear()
         return
 
@@ -712,59 +722,27 @@ SAVOL: {task['savol']}
 Quyidagi audioni TO'LIQ va TABIIY tahlil qil. Har bir bo'limda emoji ishlatilsin.
 O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
 
-1. 📝 TRANSCRIPT
-O'quvchi aytgan gaplarni so'zma-so'z yoz.
+1. 📝 TRANSCRIPT — so'zma-so'z yoz
+2. 📊 BAHO — foizda:
+🎯 Accuracy: X%
+📚 Vocabulary: X%
+🗣 Fluency: X%
+📖 Grammar: X%
+🔊 Pronunciation: X%
+⭐ Overall: X%
+3. 📝 IZOH — ✅ Kuchli, ⚠️ O'rtacha, ❌ Zaif
+4. ❌ GRAMMAR — xato → to'g'ri
+5. 📚 VOCABULARY — oddiy → kuchli
+6. 🔗 COLLOCATIONS — to'g'ri/noto'g'ri
+7. 📍 PREPOSITIONS — xato → to'g'ri
+8. 🗣 FLUENCY — pauzalar, filler words
+9. 🧠 CONTENT — to'liq javob
+10. ✨ IMPROVED VERSION — yaxshilangan
+11. 🎯 SAMPLE ANSWER — IELTS 8+ namuna
+12. 💡 TAVSIYA — 3-5 maslahat
 
-2. 📊 BAHO
-Har bir mezon uchun foizda baho ber:
-🎯 Accuracy (aniqlik): X%
-📚 Vocabulary (so'z boyligi): X%
-🗣 Fluency (ravonlik): X%
-📖 Grammar (grammatika): X%
-🔊 Pronunciation (talaffuz): X%
-⭐ Overall (umumiy): X%
-
-3. 📝 IZOH
-✅ Kuchli tomonlar
-⚠️ O'rtacha tomonlar
-❌ Zaif tomonlar
-
-4. ❌ GRAMMAR XATOLARI
-Har bir xatoni ko'rsat:
-❌ Xato: [xato gap]
-✅ To'g'ri: [to'g'ri gap]
-💡 Izoh: [nega xato]
-
-5. 📚 VOCABULARY TAKLIFLARI
-🔄 [oddiy so'z] → [kuchli so'z]
-💡 Misol: [misol gap]
-
-6. 🔗 COLLOCATIONS
-✅ [to'g'ri birikma]
-❌ [noto'g'ri birikma]
-💡 Izoh
-
-7. 📍 PREPOSITIONS
-❌ [xato] → ✅ [to'g'ri]
-
-8. 🗣 FLUENCY
-Pauzalar, filler words, ravonlik.
-💡 Tavsiya
-
-9. 🧠 CONTENT & COHERENCE
-Savolga to'liq javob berilganmi?
-
-10. ✨ IMPROVED VERSION
-O'quvchining javobini TO'LIQ va TABIIY qilib qayta yoz.
-
-11. 🎯 NAMUNA JAVOB (SAMPLE ANSWER)
-Shu savolga IELTS 8+ darajadagi TO'LIQ NAMUNA javob yoz.
-
-12. 💡 TAVSIYA
-3-5 ta maslahat.
-
-MUHIM: Har bir bo'lim oldiga emoji qo'y. Markdown belgilar (*, _, #) ishlatma.
-O'zbek tilida yoz, misollar ingliz tilida. Qisqa va aniq."""
+MUHIM: Har bo'lim oldiga emoji. Markdown belgilar ishlatma.
+O'zbek tilida yoz. Qisqa va aniq."""
 
         tr = groq_client.audio.transcriptions.create(
             file=("audio.ogg", audio_data),
@@ -922,7 +900,48 @@ async def natijam(message: types.Message):
 async def ranking(message: types.Message):
     if is_admin(message.from_user.id):
         return
-    await message.answer("🏆 Ranking tez orada qo'shiladi.")
+
+    data = load_data()
+    user_id = str(message.from_user.id)
+
+    if user_id not in data["students"]:
+        await message.answer("Avval /start bosing.")
+        return
+
+    if not data["students"]:
+        await message.answer("🏆 Hozircha o'quvchilar yo'q.")
+        return
+
+    sorted_students = sorted(
+        data["students"].items(),
+        key=lambda x: x[1].get("ball", 0),
+        reverse=True
+    )
+
+    text = "🏆 RANKING (Top 10)\n\n"
+    medals = ["🥇", "🥈", "🥉"]
+
+    for i, (uid, info) in enumerate(sorted_students[:10], 1):
+        ism = info.get("ism", "Nomalum")
+        guruh = info.get("guruh", "—")
+        ball = info.get("ball", 0)
+        prefix = medals[i - 1] if i <= 3 else f"{i}️⃣"
+        text += f"{prefix} {ism} ({guruh}) — 💰 {ball}\n"
+
+    user_rank = None
+    for i, (uid, info) in enumerate(sorted_students, 1):
+        if uid == user_id:
+            user_rank = i
+            break
+
+    if user_rank:
+        user_ball = data["students"][user_id].get("ball", 0)
+        text += f"\n━━━━━━━━━━━━━━━\n"
+        text += f"📊 Sizning o'rningiz: #{user_rank}\n"
+        text += f"💰 Sizning ballingiz: {user_ball}\n"
+        text += f"👥 Jami o'quvchilar: {len(data['students'])}\n"
+
+    await message.answer(text)
 
 
 @dp.message(F.text == "👤 Profilim")
@@ -948,7 +967,8 @@ async def ai_suhbat(message: types.Message):
         return
 
     tugmalar = [
-        "📚 Vazifalar", "📊 Natijam", "🏆 Ranking", "👤 Profilim",
+        "📝 Vazifani topshirish", "📋 Tugallanmagan vazifalar",
+        "📊 Natijam", "🏆 Ranking", "👤 Profilim",
         "📚 Vazifa berish", "📥 Kelgan javoblar", "👥 O'quvchilar", "📊 Statistika",
         "🗑 Vazifani o'chirish", "🗑 O'quvchini o'chirish",
         "🔙 Ortga", "✅ Yuborish", "❌ Bekor qilish",
@@ -973,47 +993,19 @@ async def ai_suhbat(message: types.Message):
 
 SAVOL: {message.text}
 
-Quyidagi TO'LIQ yordamni ber. Har bir bo'limda emoji ishlatilsin.
-O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
+Quyidagi TO'LIQ yordamni ber:
 
 1. 📝 TO'LIQ JAVOB
-Savolga to'liq va aniq javob ber.
-
-2. 💡 IDEALAR (FIKRLAR)
-Savolga javob berish uchun 4-5 ta fikr taklif qil:
-💡 Idea 1: [fikr ingliz tilida]
-💡 Idea 2: [fikr ingliz tilida]
-...
-
-3. 📚 YANGI SO'ZLAR (VOCABULARY)
-Savolga mos 5-7 ta foydali so'z va ibora:
-📖 [so'z] — [tarjimasi]
-💡 Misol: [misol gap]
-
-4. 🔗 COLLOCATIONS
-Savolga mos to'g'ri so'z birikmalari:
-✅ [birikma]
-💡 Misol: [misol gap]
-
-5. 📝 GRAMMAR
-Savolga javob berishda ishlatiladigan grammatik qoidalar:
-📖 [qoida]
-💡 Misol: [misol]
-
-6. ❓ QO'SHIMCHA SAVOLLAR
-O'quvchi bilan davom etish uchun 2-3 ta savol:
-❓ [savol ingliz tilida]
-❓ [savol ingliz tilida]
-
-7. 🎯 NAMUNA JAVOB (SAMPLE ANSWER)
-Shu savolga TO'LIQ va TABIIY namuna javob yoz (IELTS 8+ darajada):
-[to'liq javob ingliz tilida]
-
+2. 💡 IDEALAR — 4-5 ta fikr (ingliz tilida)
+3. 📚 YANGI SO'ZLAR — 5-7 ta (tarjimasi bilan)
+4. 🔗 COLLOCATIONS — to'g'ri birikmalar
+5. 📝 GRAMMAR — qoidalar
+6. ❓ QO'SHIMCHA SAVOLLAR — 2-3 ta
+7. 🎯 SAMPLE ANSWER — IELTS 8+ namuna
 8. ✅ TUSHUNARLI
-Barchasi oddiy va tushunarli tilda yozilgan.
 
-MUHIM: Har bir bo'lim oldiga emoji qo'y. Markdown belgilar (*, _, #) ishlatma.
-O'zbek tilida yoz, misollar ingliz tilida. Qisqa va aniq."""
+MUHIM: Har bo'lim oldiga emoji. Markdown belgilar ishlatma.
+O'zbek tilida yoz, misollar ingliz tilida."""
 
         response = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
@@ -1047,6 +1039,101 @@ async def test_groq(message: types.Message):
         await message.answer(f"❌ Groq xatosi:\n\n{e}")
 
 
+# ==================== KUNLIK ESLATMA ====================
+async def daily_reminder():
+    """Har kuni o'quvchilarga tugallanmagan vazifalar haqida eslatma"""
+    while True:
+        try:
+            now = datetime.now()
+            # Har kuni soat 09:00 da
+            if now.hour == 9 and now.minute == 0:
+                data = load_data()
+                for uid, info in data["students"].items():
+                    tugallanmagan = []
+                    for tid, task in data["tasks"].items():
+                        submitted = data["submissions"].get(tid, {})
+                        if uid not in submitted:
+                            tugallanmagan.append(f"{tid}. {task['nomi']}")
+
+                    if tugallanmagan:
+                        text = f"🌅 XAYRLI TONG, {info.get('ism', 'o\'quvchi')}!\n\n"
+                        text += f"📋 Sizda {len(tugallanmagan)} ta tugallanmagan vazifa bor:\n\n"
+                        for v in tugallanmagan:
+                            text += f"• {v}\n"
+                        text += f"\n📝 Topshirish uchun '📝 Vazifani topshirish' tugmasini bosing."
+
+                        try:
+                            await bot.send_message(int(uid), text)
+                        except Exception as e:
+                            logger.error(f"Eslatma xatosi {uid}: {e}")
+
+                await asyncio.sleep(60)
+            else:
+                await asyncio.sleep(60)
+        except Exception as e:
+            logger.error(f"Kunlik eslatma xatosi: {e}")
+            await asyncio.sleep(60)
+
+
+# ==================== DEADLINE OGOHLANTIRISH ====================
+async def deadline_warning():
+    """Deadline dan oldin 3 marta ogohlantirish (4h, 2h, 1h)"""
+    sent_warnings = {}
+
+    while True:
+        try:
+            now = datetime.now()
+            data = load_data()
+
+            for tid, task in data["tasks"].items():
+                deadline_str = task.get("deadline", "")
+                try:
+                    # Deadline formatini o'qish
+                    deadline = datetime.strptime(deadline_str, "%Y-%m-%d %H:%M")
+                except:
+                    continue
+
+                time_left = deadline - now
+                hours_left = time_left.total_seconds() / 3600
+
+                # 3 ta ogohlantirish: 4 soat, 2 soat, 1 soat
+                warning_times = [
+                    (4, "⏰ 4 soat qoldi!"),
+                    (2, "⚠️ 2 soat qoldi!"),
+                    (1, "🔴 1 soat qoldi!"),
+                ]
+
+                for warn_hour, warn_text in warning_times:
+                    key = f"{tid}_{warn_hour}"
+                    if key not in sent_warnings:
+                        sent_warnings[key] = []
+
+                    if 0 < hours_left <= warn_hour and warn_hour - hours_left < 0.1:
+                        if now.hour not in sent_warnings[key]:
+                            sent_warnings[key].append(now.hour)
+
+                            for uid, info in data["students"].items():
+                                submitted = data["submissions"].get(tid, {})
+                                if uid not in submitted:
+                                    try:
+                                        await bot.send_message(
+                                            int(uid),
+                                            f"🔔 {warn_text}\n\n"
+                                            f"👤 Hurmatli {info.get('ism', 'o\'quvchi')},\n"
+                                            f"📚 Sizda tugallanmagan topshiriq bor:\n\n"
+                                            f"📝 {tid}. {task['nomi']}\n"
+                                            f"⏰ Deadline: {task['deadline']}\n\n"
+                                            f"Iltimos, vaqtida topshiring!",
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"Ogohlantirish xatosi {uid}: {e}")
+
+            await asyncio.sleep(60)
+        except Exception as e:
+            logger.error(f"Deadline ogohlantirish xatosi: {e}")
+            await asyncio.sleep(60)
+
+
 # ==================== WEB SERVER ====================
 async def handle(request):
     return web.Response(text="🤖 Speaking Bot ishlayapti!")
@@ -1066,6 +1153,8 @@ async def web_server():
 async def main():
     logger.info("Bot ishga tushmoqda...")
     asyncio.create_task(web_server())
+    asyncio.create_task(daily_reminder())
+    asyncio.create_task(deadline_warning())
     await dp.start_polling(bot)
 
 
