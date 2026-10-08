@@ -33,7 +33,6 @@ DEFAULT_DATA = {
     "pending_students": {},
     "tasks": {},
     "submissions": {},
-    "free_audios": {},
 }
 
 bot = Bot(token=TOKEN)
@@ -70,11 +69,6 @@ def is_admin(user_id):
 def is_student(user_id):
     data = load_data()
     return str(user_id) in data["students"]
-
-
-def is_pending(user_id):
-    data = load_data()
-    return str(user_id) in data["pending_students"]
 
 
 def now_str():
@@ -147,7 +141,6 @@ def ortga_menu():
     )
 
 
-# Filtrlash uchun
 TUGMA_MATNLARI = {
     "📝 Vazifa topshirish", "🎤 Erkin audio", "📊 Natijam", "🏆 Ranking", "👤 Profilim",
     "📚 Vazifa berish", "📥 Kelgan javoblar", "👥 O'quvchilar", "📊 Statistika",
@@ -158,59 +151,47 @@ TUGMA_MATNLARI = {
 # ==================== START ====================
 @dp.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
-    await state.clear()  # MUHIM: har doim state tozalanadi
+    await state.clear()
     user_id = message.from_user.id
 
-    # Admin
     if is_admin(user_id):
         await message.answer("👨‍🏫 Salom, teacher!\n\nAdmin panel:", reply_markup=admin_menu())
         return
 
-    # Tasdiqlangan o'quvchi
-    if is_student(user_id):
-        data = load_data()
-        student = data["students"][str(user_id)]
+    data = load_data()
+    user_id_str = str(user_id)
+
+    if user_id_str in data["students"]:
+        student = data["students"][user_id_str]
         await message.answer(
-            f"👋 Salom, {student['ism']}!\n\n"
-            f"🏫 Guruh: {student['guruh']}\n"
-            f"💰 Ball: {student.get('ball', 0)}\n\n"
-            f"Quyidagi menyudan foydalaning:",
+            f"👋 Salom, {student.get('ism', 'o\'quvchi')}!\n\n"
+            f"🏫 Guruh: {student.get('guruh', '—')}\n"
+            f"💰 Ball: {student.get('ball', 0)}",
             reply_markup=oquvchi_menu(),
         )
         return
 
-    # Tasdiqlash kutilayotgan
-    if is_pending(user_id):
-        await message.answer(
-            "⏳ So'rovingiz admin tasdiqlashini kutmoqda.\n\n"
-            "Iltimos, kuting. Tasdiqlangach xabar yuboriladi."
-        )
+    if user_id_str in data["pending_students"]:
+        await message.answer("⏳ So'rovingiz admin tasdiqlashini kutmoqda.")
         return
 
-    # Yangi foydalanuvchi
     await message.answer(
         "👋 Salom! Botdan foydalanish uchun ro'yxatdan o'ting.\n\n"
-        "1️⃣ Ism va familiyangizni yozing:\n"
-        "(Masalan: Shohrux Karimov)"
+        "1️⃣ Ism va familiyangizni yozing:\n(Masalan: Shohrux Karimov)"
     )
     await state.set_state(Royxat.ism)
 
 
-# ==================== RO'YXATDAN O'TISH ====================
 @dp.message(Royxat.ism)
 async def royxat_ism(message: types.Message, state: FSMContext):
-    # Tugma yoki komanda bo'lsa qaytarish
     if not message.text:
-        await message.answer("Iltimos, ism-familiyangizni matn ko'rinishida yozing:")
+        await message.answer("Ism-familiyangizni matn ko'rinishida yozing:")
         return
 
     ism = message.text.strip()
 
     if ism in TUGMA_MATNLARI or ism.startswith("/"):
-        await message.answer(
-            "❗ Iltimos, ism-familiyangizni matn ko'rinishida yozing.\n"
-            "(Masalan: Shohrux Karimov)"
-        )
+        await message.answer("❗ Iltimos, ism-familiyangizni matn ko'rinishida yozing:")
         return
 
     if len(ism) < 3 or len(ism) > 60:
@@ -218,27 +199,20 @@ async def royxat_ism(message: types.Message, state: FSMContext):
         return
 
     await state.update_data(ism=ism)
-    await message.answer(
-        f"✅ {ism}\n\n"
-        f"2️⃣ Guruhingizni yozing:\n"
-        f"(Masalan: A1 guruh yoki Ingliz tili 1)"
-    )
+    await message.answer(f"✅ {ism}\n\n2️⃣ Guruhingizni yozing:\n(Masalan: A1 guruh)")
     await state.set_state(Royxat.guruh)
 
 
 @dp.message(Royxat.guruh)
 async def royxat_guruh(message: types.Message, state: FSMContext):
     if not message.text:
-        await message.answer("Iltimos, guruh nomini matn ko'rinishida yozing:")
+        await message.answer("Guruh nomini matn ko'rinishida yozing:")
         return
 
     guruh = message.text.strip()
 
     if guruh in TUGMA_MATNLARI or guruh.startswith("/"):
-        await message.answer(
-            "❗ Iltimos, guruh nomini matn ko'rinishida yozing.\n"
-            "(Masalan: A1 guruh)"
-        )
+        await message.answer("❗ Iltimos, guruh nomini matn ko'rinishida yozing:")
         return
 
     if len(guruh) < 2 or len(guruh) > 40:
@@ -268,19 +242,15 @@ async def royxat_guruh(message: types.Message, state: FSMContext):
         await bot.send_message(
             ADMIN_ID,
             f"🆕 YANGI SO'ROV!\n\n"
-            f"👤 {ism}\n"
-            f"🏫 {guruh}\n"
-            f"📱 {message.from_user.full_name}\n"
-            f"🆔 {user_id}\n\n"
-            f"Tasdiqlaysizmi?",
+            f"👤 {ism}\n🏫 {guruh}\n"
+            f"📱 {message.from_user.full_name}\n🆔 {user_id}\n\nTasdiqlaysizmi?",
             reply_markup=kb,
         )
     except Exception as e:
         logger.error(f"Admin xabari xatosi: {e}")
 
     await message.answer(
-        "⏳ So'rovingiz adminga yuborildi.\n\n"
-        "Admin tasdiqlagach, sizga xabar yuboriladi va botdan foydalanishingiz mumkin bo'ladi."
+        "⏳ So'rovingiz adminga yuborildi.\nAdmin tasdiqlagach xabar yuboriladi."
     )
     await state.clear()
 
@@ -314,18 +284,14 @@ async def approve_student(callback: types.CallbackQuery):
         await bot.send_message(
             int(user_id),
             f"✅ So'rovingiz tasdiqlandi!\n\n"
-            f"👤 {student['ism']}\n"
-            f"🏫 {student['guruh']}\n\n"
-            f"Endi botdan to'liq foydalanishingiz mumkin. "
-            f"Quyidagi menyudan foydalaning:",
+            f"👤 {student['ism']}\n🏫 {student['guruh']}\n\n"
+            f"Endi botdan to'liq foydalanishingiz mumkin:",
             reply_markup=oquvchi_menu(),
         )
     except Exception as e:
         logger.error(f"Xabar xatosi: {e}")
 
-    await callback.message.edit_text(
-        f"✅ TASDIQLANDI\n\n👤 {student['ism']}\n🏫 {student['guruh']}"
-    )
+    await callback.message.edit_text(f"✅ TASDIQLANDI: {student['ism']} ({student['guruh']})")
     await callback.answer("Tasdiqlandi!")
 
 
@@ -339,7 +305,7 @@ async def reject_student(callback: types.CallbackQuery):
     data = load_data()
 
     if user_id not in data["pending_students"]:
-        await callback.answer("Bu o'quvchi allaqachon tasdiqlangan yoki rad etilgan.")
+        await callback.answer("Allaqachon tasdiqlangan.")
         return
 
     student = data["pending_students"][user_id]
@@ -347,17 +313,11 @@ async def reject_student(callback: types.CallbackQuery):
     save_data(data)
 
     try:
-        await bot.send_message(
-            int(user_id),
-            "❌ Afsuski, so'rovingiz rad etildi.\n\n"
-            "Savollar uchun o'qituvchingizga murojaat qiling."
-        )
+        await bot.send_message(int(user_id), "❌ So'rovingiz rad etildi.")
     except Exception as e:
         logger.error(f"Xabar xatosi: {e}")
 
-    await callback.message.edit_text(
-        f"❌ RAD ETILDI\n\n👤 {student['ism']}\n🏫 {student['guruh']}"
-    )
+    await callback.message.edit_text(f"❌ RAD ETILDI: {student['ism']} ({student['guruh']})")
     await callback.answer("Rad etildi!")
 
 
@@ -369,8 +329,7 @@ async def vazifa_berish_boshlash(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
         "📚 YANGI VAZIFA\n\n"
-        "1️⃣ Vazifa nomini yozing:\n"
-        "(Masalan: Part 1.1 yoki Speaking Task 1)",
+        "1️⃣ Vazifa nomini yozing:\n(Masalan: Part 1.1)",
         reply_markup=ortga_menu(),
     )
     await state.set_state(VazifaBerish.nomi)
@@ -379,11 +338,11 @@ async def vazifa_berish_boshlash(message: types.Message, state: FSMContext):
 @dp.message(VazifaBerish.nomi)
 async def vazifa_nomi(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
-        await message.answer("Asosiy menyuga qaytdingiz.", reply_markup=admin_menu())
+        await message.answer("Asosiy menyu.", reply_markup=admin_menu())
         await state.clear()
         return
     if not message.text:
-        await message.answer("Vazifa nomini matn ko'rinishida yozing:")
+        await message.answer("Vazifa nomini yozing:")
         return
 
     nomi = message.text.strip()
@@ -398,11 +357,8 @@ async def vazifa_nomi(message: types.Message, state: FSMContext):
         f"Masalan:\n"
         f"1. What is your name?\n"
         f"2. Where are you from?\n"
-        f"3. Do you like reading?\n\n"
-        f"Yoki oddiy qatorlar bilan:\n"
-        f"What is your name?\n"
-        f"Where are you from?\n"
-        f"Do you like reading?"
+        f"3. Do you like reading?\n"
+        f"..."
     )
     await state.set_state(VazifaBerish.savollar)
 
@@ -410,10 +366,7 @@ async def vazifa_nomi(message: types.Message, state: FSMContext):
 @dp.message(VazifaBerish.savollar)
 async def vazifa_savollar(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
-        await message.answer(
-            "⬅️ Bitta qadam orqaga.\n\n"
-            "1️⃣ Vazifa nomini qaytadan yozing:"
-        )
+        await message.answer("⬅️ Bitta qadam orqaga.\n\n1️⃣ Vazifa nomini qaytadan yozing:")
         await state.set_state(VazifaBerish.nomi)
         return
     if not message.text:
@@ -426,7 +379,6 @@ async def vazifa_savollar(message: types.Message, state: FSMContext):
         line = line.strip()
         if not line:
             continue
-        # Raqam va nuqtani olib tashlash
         cleaned = re.sub(r'^\d+[\.\)\-\:]\s*', '', line)
         if cleaned:
             savollar.append(cleaned)
@@ -438,8 +390,7 @@ async def vazifa_savollar(message: types.Message, state: FSMContext):
     await state.update_data(savollar=savollar)
     await message.answer(
         f"✅ {len(savollar)} ta savol qabul qilindi.\n\n"
-        f"3️⃣ Deadline kiriting:\n"
-        f"(Masalan: 2026-10-15 20:00)"
+        f"3️⃣ Deadline kiriting:\n(Masalan: 2026-10-15 20:00)"
     )
     await state.set_state(VazifaBerish.deadline)
 
@@ -489,7 +440,7 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
         await state.set_state(VazifaBerish.deadline)
         return
     if message.text != "✅ Yuborish":
-        await message.answer("Iltimos, tugmalardan birini tanlang: ✅ Yuborish yoki ❌ Bekor qilish")
+        await message.answer("Iltimos, ✅ Yuborish yoki ❌ Bekor qilish tugmasini tanlang.")
         return
 
     data_user = await state.get_data()
@@ -542,21 +493,15 @@ async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
     await state.clear()
 
     user_id = str(message.from_user.id)
-
     if not is_student(user_id):
-        if is_pending(user_id):
-            await message.answer("⏳ So'rovingiz hali tasdiqlanmagan. Iltimos, kuting.")
-        else:
-            await message.answer("Avval /start buyrug'ini bosing.")
+        await message.answer("Avval /start bosing va tasdiqlanishni kuting.")
         return
 
     data = load_data()
-
     if not data["tasks"]:
         await message.answer(
-            "📚 Hozircha vazifalar mavjud emas.\n\n"
-            "🎤 'Erkin audio' tugmasi orqali xohlagan audioni yuborishingiz mumkin — "
-            "AI tahlil qiladi va foizda baho beradi."
+            "📚 Hozircha vazifalar yo'q.\n\n"
+            "🎤 'Erkin audio' tugmasi orqali xohlagan audioni yuboring — AI tahlil qiladi."
         )
         return
 
@@ -575,7 +520,7 @@ async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
 @dp.message(VazifaTopshirish.task_tanlash, F.text)
 async def task_tanlash(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
-        await message.answer("Asosiy menyuga qaytdingiz.", reply_markup=oquvchi_menu())
+        await message.answer("Asosiy menyu.", reply_markup=oquvchi_menu())
         await state.clear()
         return
 
@@ -584,10 +529,10 @@ async def task_tanlash(message: types.Message, state: FSMContext):
     user_id = str(message.from_user.id)
 
     if task_id not in data["tasks"]:
+        mavjud = ', '.join(sorted(data['tasks'].keys()))
         await message.answer(
             f"❌ '{task_id}' raqamli vazifa topilmadi.\n\n"
-            f"Mavjud vazifalar: {', '.join(sorted(data['tasks'].keys()))}\n\n"
-            f"Qaytadan raqam kiriting yoki 🔙 Ortga bosing:"
+            f"Mavjud vazifalar: {mavjud}\n\nQaytadan raqam kiriting:"
         )
         return
 
@@ -603,8 +548,7 @@ async def task_tanlash(message: types.Message, state: FSMContext):
         status = "🟢 Yuborilgan" if str(i) in audios else "🔴 Yuborilmagan"
         text += f"{i}. {savol}\n   {status}\n\n"
 
-    text += f"🎤 Qaysi savolga audio yubormoqchisiz?\n"
-    text += f"Savol raqamini yozing (1-{len(savollar)}):"
+    text += f"🎤 Qaysi savolga audio yubormoqchisiz?\nSavol raqamini yozing (1-{len(savollar)}):"
 
     await state.update_data(task_id=task_id)
     await message.answer(text, reply_markup=ortga_menu())
@@ -614,7 +558,6 @@ async def task_tanlash(message: types.Message, state: FSMContext):
 @dp.message(VazifaTopshirish.savol_tanlash, F.text)
 async def savol_tanlash(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
-        # Orqaga: vazifa tanlashga qaytish
         data = load_data()
         user_id = str(message.from_user.id)
         text = "📝 VAZIFA TOPSHIRISH\n\nQaysi vazifani topshirmoqchisiz?\n\n"
@@ -661,7 +604,7 @@ async def savol_tanlash(message: types.Message, state: FSMContext):
         f"📌 {savol_raqami}-savol:\n\n"
         f"❓ {savol}\n\n"
         f"🎤 Endi audio javobingizni yuboring:\n\n"
-        f"ℹ️ Xohlagancha qayta yuborishingiz mumkin — AI har safar yangi baho beradi."
+        f"ℹ️ Xohlagancha qayta yuborishingiz mumkin."
     )
     await state.set_state(VazifaTopshirish.audio_kutish)
 
@@ -669,7 +612,6 @@ async def savol_tanlash(message: types.Message, state: FSMContext):
 @dp.message(VazifaTopshirish.audio_kutish, F.text)
 async def audio_kutish_text(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
-        # Savol tanlashga qaytish
         data_user = await state.get_data()
         task_id = data_user.get("task_id")
         data = load_data()
@@ -686,21 +628,17 @@ async def audio_kutish_text(message: types.Message, state: FSMContext):
             for i, savol in enumerate(savollar, 1):
                 status = "🟢 Yuborilgan" if str(i) in audios else "🔴 Yuborilmagan"
                 text += f"{i}. {savol}\n   {status}\n\n"
-            text += f"🎤 Qaysi savolga audio yubormoqchisiz?\n"
-            text += f"Savol raqamini yozing (1-{len(savollar)}):"
+            text += f"🎤 Savol raqamini yozing (1-{len(savollar)}):"
 
             await message.answer("⬅️ Bitta qadam orqaga.\n\n" + text, reply_markup=ortga_menu())
             await state.set_state(VazifaTopshirish.savol_tanlash)
             return
 
-        await message.answer("Asosiy menyuga qaytdingiz.", reply_markup=oquvchi_menu())
+        await message.answer("Asosiy menyu.", reply_markup=oquvchi_menu())
         await state.clear()
         return
 
-    await message.answer(
-        "🎤 Iltimos, audio (voice xabar) yuboring.\n\n"
-        "Yoki 🔙 Ortga tugmasini bosing."
-    )
+    await message.answer("🎤 Iltimos, audio (voice) yuboring yoki 🔙 Ortga bosing.")
 
 
 @dp.message(VazifaTopshirish.audio_kutish, F.voice)
@@ -718,7 +656,7 @@ async def audio_vazifa_qabul(message: types.Message, state: FSMContext):
     data = load_data()
     task = data["tasks"].get(task_id)
     if not task:
-        await message.answer("Vazifa topilmadi. Qaytadan boshlang.")
+        await message.answer("Vazifa topilmadi.")
         await state.clear()
         return
 
@@ -740,12 +678,8 @@ async def erkin_audio_boshlash(message: types.Message, state: FSMContext):
     await state.clear()
 
     user_id = str(message.from_user.id)
-
     if not is_student(user_id):
-        if is_pending(user_id):
-            await message.answer("⏳ So'rovingiz hali tasdiqlanmagan. Iltimos, kuting.")
-        else:
-            await message.answer("Avval /start buyrug'ini bosing.")
+        await message.answer("Avval /start bosing va tasdiqlanishni kuting.")
         return
 
     await message.answer(
@@ -761,16 +695,15 @@ async def erkin_audio_boshlash(message: types.Message, state: FSMContext):
 @dp.message(ErkinAudio.kutish, F.text)
 async def erkin_audio_text(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
-        await message.answer("Asosiy menyuga qaytdingiz.", reply_markup=oquvchi_menu())
+        await message.answer("Asosiy menyu.", reply_markup=oquvchi_menu())
         await state.clear()
         return
-    await message.answer("🎤 Iltimos, audio (voice xabar) yuboring:")
+    await message.answer("🎤 Iltimos, audio (voice) yuboring:")
 
 
 @dp.message(ErkinAudio.kutish, F.voice)
 async def erkin_audio_qabul(message: types.Message, state: FSMContext):
     user_id = str(message.from_user.id)
-
     if not is_student(user_id):
         await message.answer("Avval /start bosing.")
         await state.clear()
@@ -790,7 +723,6 @@ async def process_audio(message, state, task_id, savol_raqami, savol, task):
     else:
         await message.answer("⏳ Audio qabul qilindi. AI tahlil qilmoqda...")
 
-    # Audio yuklab olish
     try:
         file = await bot.get_file(message.voice.file_id)
         file_bytes = await bot.download_file(file.file_path)
@@ -800,7 +732,6 @@ async def process_audio(message, state, task_id, savol_raqami, savol, task):
         await message.answer("❌ Audio yuklab olishda xatolik. Qayta urinib ko'ring.")
         return
 
-    # AI tahlil
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     overall = 0
     try:
@@ -809,7 +740,7 @@ O'quvchi quyidagi savolga javob berdi:
 
 SAVOL: {savol}
 
-Audioni TO'LIQ va TABIIY tahlil qil.
+Audioni TO'LIQ va TABIIY tahlil qil. O'quvchiga do'stona munosabatda bo'l.
 BARCHA IZOHLAR O'ZBEK TILIDA BO'LISHI SHART! Faqat ingliz tilidagi misollar ingliz tilida bo'lsin.
 
 1. 📝 TRANSCRIPT — o'quvchi aytgan gaplarni so'zma-so'z yoz
@@ -862,7 +793,6 @@ MUHIM:
         )
         ai_tahlil = response.choices[0].message.content
 
-        # Overall ni ajratib olish
         match = re.search(r'Overall[\s:]*(\d{1,3})', ai_tahlil, re.IGNORECASE)
         if match:
             overall = int(match.group(1))
@@ -875,9 +805,8 @@ MUHIM:
                 overall = sum(nums[:5]) // min(5, len(nums))
     except Exception as e:
         logger.error(f"Groq xatosi: {e}")
-        ai_tahlil = "⚠️ AI tahlil qilishda xatolik. Iltimos, keyinroq qayta urinib ko'ring."
+        ai_tahlil = "⚠️ AI tahlil qilishda xatolik. Keyinroq qayta urinib ko'ring."
 
-    # Ball hisoblash
     if overall >= 60:
         ball = 1.0
     elif overall >= 50:
@@ -885,7 +814,6 @@ MUHIM:
     else:
         ball = 0.0
 
-    # Saqlash
     if task_id is not None:
         if task_id not in data["submissions"]:
             data["submissions"][task_id] = {}
@@ -909,6 +837,8 @@ MUHIM:
         if user_id in data["students"]:
             data["students"][user_id]["ball"] = total_ball
     else:
+        if "free_audios" not in data:
+            data["free_audios"] = {}
         if user_id not in data["free_audios"]:
             data["free_audios"][user_id] = {}
         eid = str(len(data["free_audios"][user_id]) + 1)
@@ -925,12 +855,11 @@ MUHIM:
     ism = data["students"][user_id].get("ism", "Nomalum")
     guruh = data["students"][user_id].get("guruh", "—")
 
-    # O'quvchiga tahlil
     header = "🤖 AI TAHLIL\n\n"
     if savol_raqami:
         header = f"🤖 AI TAHLIL — {savol_raqami}-savol\n\n"
     full_text = header + ai_tahlil
-    full_text += f"\n\n━━━━━━━━━━━━━━━\n"
+    full_text += "\n\n━━━━━━━━━━━━━━━\n"
     full_text += f"📊 UMUMIY BAHO: {overall}%"
     if task_id is not None:
         full_text += f"\n🎯 Bu audio uchun ball: {ball}"
@@ -942,21 +871,18 @@ MUHIM:
     else:
         await message.answer(full_text)
 
-    # Keyingi qadam
     if task_id is not None:
         await message.answer(
             f"✅ {savol_raqami}-savol topshirildi!\n\n"
-            f"🎤 Xohlagancha qayta yuborishingiz yoki boshqa savolga o'tishingiz mumkin.",
+            f"🎤 Boshqa savolga audio tashlang yoki qayta yuboring.",
             reply_markup=oquvchi_menu(),
         )
     else:
         await message.answer(
-            "✅ Audio tahlil qilindi!\n\n"
-            "🎤 Yana audio yuborishingiz mumkin.",
+            "✅ Audio tahlil qilindi!\n\n🎤 Yana audio yuborishingiz mumkin.",
             reply_markup=oquvchi_menu(),
         )
 
-    # Adminga xabar
     try:
         if task_id is not None:
             task_name = task['nomi'] if task else "—"
@@ -984,7 +910,7 @@ async def kelgan_javoblar(message: types.Message):
         return
 
     data = load_data()
-    if not data["submissions"] and not data.get("free_audios"):
+    if not data["submissions"]:
         await message.answer("📥 Hozircha javoblar yo'q.")
         return
 
@@ -1078,10 +1004,7 @@ async def natijam(message: types.Message, state: FSMContext):
     data = load_data()
 
     if user_id not in data["students"]:
-        if user_id in data["pending_students"]:
-            await message.answer("⏳ So'rovingiz hali tasdiqlanmagan.")
-        else:
-            await message.answer("Avval /start buyrug'ini bosing.")
+        await message.answer("Avval /start bosing.")
         return
 
     s = data["students"][user_id]
@@ -1127,11 +1050,25 @@ async def ranking(message: types.Message, state: FSMContext):
         reverse=True,
     )
 
-    text = "🏆 RANKING\n\n"
+    text = "🏆 RANKING (Top 10)\n\n"
     medals = ["🥇", "🥈", "🥉"]
-    for i, (uid, info) in enumerate(sorted_students, 1):
+    for i, (uid, info) in enumerate(sorted_students[:10], 1):
         medal = medals[i-1] if i <= 3 else f"{i}."
         text += f"{medal} {info.get('ism')} ({info.get('guruh')}) — 💰 {info.get('ball', 0)}\n"
+
+    user_id = str(message.from_user.id)
+    user_rank = None
+    for i, (uid, info) in enumerate(sorted_students, 1):
+        if uid == user_id:
+            user_rank = i
+            break
+
+    if user_rank:
+        user_ball = data["students"][user_id].get("ball", 0)
+        text += f"\n━━━━━━━━━━━━━━━\n"
+        text += f"📊 Sizning o'rningiz: #{user_rank}\n"
+        text += f"💰 Sizning ballingiz: {user_ball}\n"
+        text += f"👥 Jami o'quvchilar: {len(data['students'])}\n"
 
     if len(text) > 4000:
         for i in range(0, len(text), 4000):
@@ -1147,14 +1084,9 @@ async def profilim(message: types.Message, state: FSMContext):
         return
     user_id = str(message.from_user.id)
     data = load_data()
-
     if user_id not in data["students"]:
-        if user_id in data["pending_students"]:
-            await message.answer("⏳ So'rovingiz hali tasdiqlanmagan.")
-        else:
-            await message.answer("Avval /start buyrug'ini bosing.")
+        await message.answer("Avval /start bosing.")
         return
-
     s = data["students"][user_id]
     await message.answer(
         f"👤 PROFILINGIZ\n\n"
