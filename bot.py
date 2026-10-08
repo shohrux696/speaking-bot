@@ -33,6 +33,7 @@ DEFAULT_DATA = {
     "pending_students": {},
     "tasks": {},
     "submissions": {},
+    "free_audios": {},
 }
 
 bot = Bot(token=TOKEN)
@@ -94,7 +95,7 @@ class VazifaTopshirish(StatesGroup):
     audio_kutish = State()
 
 
-class ErkinAudio(StatesGroup):
+class QoshimchaSpeaking(StatesGroup):
     kutish = State()
 
 
@@ -103,7 +104,7 @@ def oquvchi_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📝 Vazifa topshirish")],
-            [KeyboardButton(text="🎤 Erkin audio")],
+            [KeyboardButton(text="🎤 Qo'shimcha speaking tashlash")],
             [KeyboardButton(text="📊 Natijam")],
             [KeyboardButton(text="🏆 Ranking")],
             [KeyboardButton(text="👤 Profilim")],
@@ -142,7 +143,8 @@ def ortga_menu():
 
 
 TUGMA_MATNLARI = {
-    "📝 Vazifa topshirish", "🎤 Erkin audio", "📊 Natijam", "🏆 Ranking", "👤 Profilim",
+    "📝 Vazifa topshirish", "🎤 Qo'shimcha speaking tashlash",
+    "📊 Natijam", "🏆 Ranking", "👤 Profilim",
     "📚 Vazifa berish", "📥 Kelgan javoblar", "👥 O'quvchilar", "📊 Statistika",
     "🔙 Ortga", "✅ Yuborish", "❌ Bekor qilish",
 }
@@ -501,18 +503,21 @@ async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
     if not data["tasks"]:
         await message.answer(
             "📚 Hozircha vazifalar yo'q.\n\n"
-            "🎤 'Erkin audio' tugmasi orqali xohlagan audioni yuboring — AI tahlil qiladi."
+            "🎤 'Qo'shimcha speaking tashlash' tugmasi orqali audio yuboring — AI tekshiradi."
         )
         return
 
-    text = "📝 VAZIFA TOPSHIRISH\n\nQaysi vazifani topshirmoqchisiz?\n\n"
+    # AI javob yo'q — faqat vazifalar ro'yxati
+    text = "📋 VAZIFALAR RO'YXATI\n\n"
     for tid, task in sorted(data["tasks"].items(), key=lambda x: int(x[0])):
         sub = data["submissions"].get(tid, {}).get(user_id, {})
         audios = sub.get("audios", {})
         max_b = task.get('savollar_soni', 0)
-        text += f"{tid}. {task['nomi']} — 🎤 {len(audios)}/{max_b}\n"
+        text += f"{tid}. {task['nomi']}  🎤 {len(audios)}/{max_b}\n"
 
-    text += "\nVazifa raqamini yozing:"
+    text += "\n━━━━━━━━━━━━━━━\n"
+    text += "✍️ Vazifa raqamini yozing:"
+
     await message.answer(text, reply_markup=ortga_menu())
     await state.set_state(VazifaTopshirish.task_tanlash)
 
@@ -529,7 +534,7 @@ async def task_tanlash(message: types.Message, state: FSMContext):
     user_id = str(message.from_user.id)
 
     if task_id not in data["tasks"]:
-        mavjud = ', '.join(sorted(data['tasks'].keys()))
+        mavjud = ', '.join(sorted(data['tasks'].keys(), key=lambda x: int(x) if x.isdigit() else 0))
         await message.answer(
             f"❌ '{task_id}' raqamli vazifa topilmadi.\n\n"
             f"Mavjud vazifalar: {mavjud}\n\nQaytadan raqam kiriting:"
@@ -560,13 +565,13 @@ async def savol_tanlash(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
         data = load_data()
         user_id = str(message.from_user.id)
-        text = "📝 VAZIFA TOPSHIRISH\n\nQaysi vazifani topshirmoqchisiz?\n\n"
+        text = "📋 VAZIFALAR RO'YXATI\n\n"
         for tid, task in sorted(data["tasks"].items(), key=lambda x: int(x[0])):
             sub = data["submissions"].get(tid, {}).get(user_id, {})
             audios = sub.get("audios", {})
             max_b = task.get('savollar_soni', 0)
-            text += f"{tid}. {task['nomi']} — 🎤 {len(audios)}/{max_b}\n"
-        text += "\nVazifa raqamini yozing:"
+            text += f"{tid}. {task['nomi']}  🎤 {len(audios)}/{max_b}\n"
+        text += "\n✍️ Vazifa raqamini yozing:"
         await message.answer("⬅️ Bitta qadam orqaga.\n\n" + text, reply_markup=ortga_menu())
         await state.set_state(VazifaTopshirish.task_tanlash)
         return
@@ -670,9 +675,9 @@ async def audio_vazifa_qabul(message: types.Message, state: FSMContext):
     await process_audio(message, state, task_id, savol_raqami, savol, task)
 
 
-# ==================== ERKIN AUDIO ====================
-@dp.message(F.text == "🎤 Erkin audio")
-async def erkin_audio_boshlash(message: types.Message, state: FSMContext):
+# ==================== QO'SHIMCHA SPEAKING TASHLASH ====================
+@dp.message(F.text == "🎤 Qo'shimcha speaking tashlash")
+async def qoshimcha_speaking_boshlash(message: types.Message, state: FSMContext):
     if is_admin(message.from_user.id):
         return
     await state.clear()
@@ -683,17 +688,17 @@ async def erkin_audio_boshlash(message: types.Message, state: FSMContext):
         return
 
     await message.answer(
-        "🎤 ERKIN AUDIO\n\n"
-        "Xohlagan mavzuda yoki savolga erkin javob yuboring.\n"
+        "🎤 QO'SHIMCHA SPEAKING TASHLASH\n\n"
+        "Xohlagan mavzuda yoki erkin savolga javob yuboring.\n"
         "AI tahlil qiladi va foizda baho beradi.\n\n"
         "🎤 Audioni yuboring:",
         reply_markup=ortga_menu(),
     )
-    await state.set_state(ErkinAudio.kutish)
+    await state.set_state(QoshimchaSpeaking.kutish)
 
 
-@dp.message(ErkinAudio.kutish, F.text)
-async def erkin_audio_text(message: types.Message, state: FSMContext):
+@dp.message(QoshimchaSpeaking.kutish, F.text)
+async def qoshimcha_speaking_text(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
         await message.answer("Asosiy menyu.", reply_markup=oquvchi_menu())
         await state.clear()
@@ -701,15 +706,15 @@ async def erkin_audio_text(message: types.Message, state: FSMContext):
     await message.answer("🎤 Iltimos, audio (voice) yuboring:")
 
 
-@dp.message(ErkinAudio.kutish, F.voice)
-async def erkin_audio_qabul(message: types.Message, state: FSMContext):
+@dp.message(QoshimchaSpeaking.kutish, F.voice)
+async def qoshimcha_speaking_qabul(message: types.Message, state: FSMContext):
     user_id = str(message.from_user.id)
     if not is_student(user_id):
         await message.answer("Avval /start bosing.")
         await state.clear()
         return
 
-    savol = "Erkin speaking (savolsiz)"
+    savol = "Qo'shimcha speaking (savolsiz)"
     await process_audio(message, state, None, None, savol, None)
 
 
@@ -837,8 +842,6 @@ MUHIM:
         if user_id in data["students"]:
             data["students"][user_id]["ball"] = total_ball
     else:
-        if "free_audios" not in data:
-            data["free_audios"] = {}
         if user_id not in data["free_audios"]:
             data["free_audios"][user_id] = {}
         eid = str(len(data["free_audios"][user_id]) + 1)
@@ -888,7 +891,7 @@ MUHIM:
             task_name = task['nomi'] if task else "—"
             info = f"📚 {task_name} — {savol_raqami}-savol"
         else:
-            info = "🎤 Erkin audio"
+            info = "🎤 Qo'shimcha speaking"
 
         await bot.send_message(
             ADMIN_ID,
@@ -989,7 +992,7 @@ async def admin_statistika(message: types.Message):
         f"⏳ Kutilayotgan: {total_pending}\n"
         f"📚 Vazifalar: {total_tasks}\n"
         f"🎤 Vazifa audiolari: {total_audios}\n"
-        f"🎤 Erkin audiolar: {free_audios}\n"
+        f"🎤 Qo'shimcha speaking: {free_audios}\n"
     )
     await message.answer(text)
 
@@ -1028,7 +1031,7 @@ async def natijam(message: types.Message, state: FSMContext):
 
     free_count = len(data.get("free_audios", {}).get(user_id, {}))
     if free_count:
-        text += f"\n🎤 Erkin audiolar: {free_count} ta\n"
+        text += f"\n🎤 Qo'shimcha speaking: {free_count} ta\n"
 
     text += f"\n💰 UMUMIY BALL: {s.get('ball', 0)}"
     await message.answer(text, reply_markup=oquvchi_menu())
