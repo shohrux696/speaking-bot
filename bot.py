@@ -74,44 +74,6 @@ def now_str():
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
-# ==================== SAVOL ANIQLASH ====================
-def is_question(text: str) -> bool:
-    if not text:
-        return False
-
-    text_lower = text.lower().strip()
-
-    if "?" in text:
-        return True
-
-    en_q_words = [
-        "what", "how", "why", "when", "where", "which", "who", "whom", "whose",
-        "can", "could", "should", "would", "will", "shall", "may", "might",
-        "do", "does", "did", "is", "are", "was", "were", "am",
-        "have", "has", "had", "explain", "tell me", "help me",
-    ]
-
-    for w in en_q_words:
-        if text_lower.startswith(w + " ") or text_lower == w:
-            return True
-
-    uz_q_words = [
-        "nima", "qanday", "nega", "qachon", "qayerda", "qaysi", "kim", "kimning",
-        "nechta", "qancha", "mumkinmi", "kerakmi", "bormi", "yo'qmi", "tushuntir",
-        "aytib ber", "yordam ber", "o'rgat", "misol keltir", "farqi nima",
-        "nimali", "qanaqasiga", "qanaqa", "nega bunday",
-    ]
-
-    for w in uz_q_words:
-        if w in text_lower:
-            return True
-
-    if text_lower.endswith("mi") or text_lower.endswith("mi?"):
-        return True
-
-    return False
-
-
 # ==================== HOLATLAR ====================
 class Royxat(StatesGroup):
     ism = State()
@@ -135,6 +97,10 @@ class QoshimchaSpeaking(StatesGroup):
     kutish = State()
 
 
+class AISuhbat(StatesGroup):
+    kutish = State()
+
+
 class VazifaOchirish(StatesGroup):
     vazifa_id = State()
 
@@ -149,6 +115,7 @@ def oquvchi_menu():
         keyboard=[
             [KeyboardButton(text="📝 Vazifa topshirish")],
             [KeyboardButton(text="🎤 Qo'shimcha speaking tashlash")],
+            [KeyboardButton(text="🤖 AI dan maslahat olish")],
             [KeyboardButton(text="📋 Tugallanmagan vazifalar")],
             [KeyboardButton(text="📊 Natijam")],
             [KeyboardButton(text="🏆 Ranking")],
@@ -165,6 +132,7 @@ def admin_menu():
             [KeyboardButton(text="📥 Kelgan javoblar")],
             [KeyboardButton(text="👥 O'quvchilar")],
             [KeyboardButton(text="📊 Statistika")],
+            [KeyboardButton(text="🤖 AI dan maslahat olish")],
             [KeyboardButton(text="🗑 Vazifani o'chirish")],
             [KeyboardButton(text="🗑 O'quvchini o'chirish")],
         ],
@@ -192,6 +160,7 @@ def ortga_menu():
 TUGMA_MATNLARI = {
     "📝 Vazifa topshirish",
     "🎤 Qo'shimcha speaking tashlash",
+    "🤖 AI dan maslahat olish",
     "📋 Tugallanmagan vazifalar",
     "📊 Natijam",
     "🏆 Ranking",
@@ -725,7 +694,6 @@ async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
         )
         return
 
-    # Faqat vazifalar ro'yxati — AI javob YO'Q
     text = "📋 VAZIFALAR RO'YXATI\n\n"
     for tid, task in sorted(data["tasks"].items(), key=lambda x: int(x[0]) if x[0].isdigit() else 0):
         sub = data["submissions"].get(tid, {}).get(user_id, {})
@@ -753,6 +721,8 @@ async def task_tanlash(message: types.Message, state: FSMContext):
             await vazifa_topshirish_boshlash(message, state)
         elif message.text == "🎤 Qo'shimcha speaking tashlash":
             await qoshimcha_speaking_boshlash(message, state)
+        elif message.text == "🤖 AI dan maslahat olish":
+            await ai_maslahat_boshlash(message, state)
         elif message.text == "📋 Tugallanmagan vazifalar":
             await tugallanmagan_vazifalar(message, state)
         elif message.text == "📊 Natijam":
@@ -817,6 +787,8 @@ async def savol_tanlash(message: types.Message, state: FSMContext):
             await vazifa_topshirish_boshlash(message, state)
         elif message.text == "🎤 Qo'shimcha speaking tashlash":
             await qoshimcha_speaking_boshlash(message, state)
+        elif message.text == "🤖 AI dan maslahat olish":
+            await ai_maslahat_boshlash(message, state)
         elif message.text == "📋 Tugallanmagan vazifalar":
             await tugallanmagan_vazifalar(message, state)
         elif message.text == "📊 Natijam":
@@ -900,6 +872,8 @@ async def audio_kutish_text(message: types.Message, state: FSMContext):
             await vazifa_topshirish_boshlash(message, state)
         elif message.text == "🎤 Qo'shimcha speaking tashlash":
             await qoshimcha_speaking_boshlash(message, state)
+        elif message.text == "🤖 AI dan maslahat olish":
+            await ai_maslahat_boshlash(message, state)
         elif message.text == "📋 Tugallanmagan vazifalar":
             await tugallanmagan_vazifalar(message, state)
         elif message.text == "📊 Natijam":
@@ -974,6 +948,8 @@ async def qoshimcha_speaking_text(message: types.Message, state: FSMContext):
         await state.clear()
         if message.text == "📝 Vazifa topshirish":
             await vazifa_topshirish_boshlash(message, state)
+        elif message.text == "🤖 AI dan maslahat olish":
+            await ai_maslahat_boshlash(message, state)
         elif message.text == "📋 Tugallanmagan vazifalar":
             await tugallanmagan_vazifalar(message, state)
         elif message.text == "📊 Natijam":
@@ -996,6 +972,100 @@ async def qoshimcha_speaking_qabul(message: types.Message, state: FSMContext):
 
     savol = "Qo'shimcha speaking (savolsiz)"
     await process_audio(message, state, None, None, savol, None)
+
+
+# ==================== AI DAN MASLAHAT OLISH ====================
+@dp.message(F.text == "🤖 AI dan maslahat olish")
+async def ai_maslahat_boshlash(message: types.Message, state: FSMContext):
+    await state.clear()
+    user_id = message.from_user.id
+
+    if not is_admin(user_id) and not is_student(user_id):
+        await message.answer("Avval /start bosing va tasdiqlanishni kuting.")
+        return
+
+    await message.answer(
+        "🤖 AI DAN MASLAHAT OLISH\n\n"
+        "Ingliz tili bo'yicha xohlagan savolingizni yozing.\n\n"
+        "📚 Masalan:\n"
+        "• Present Perfect nima?\n"
+        "• IELTS 8 qanday olsam bo'ladi?\n"
+        "• Grammar qoidalarini tushuntir\n"
+        "• Speaking qanday yaxshilayman?\n\n"
+        "✍️ Savolingizni yozing:",
+        reply_markup=ortga_menu(),
+    )
+    await state.set_state(AISuhbat.kutish)
+
+
+@dp.message(AISuhbat.kutish, F.text)
+async def ai_maslahat_javob(message: types.Message, state: FSMContext):
+    if message.text == "🔙 Ortga":
+        menu = admin_menu() if is_admin(message.from_user.id) else oquvchi_menu()
+        await message.answer("Asosiy menyu.", reply_markup=menu)
+        await state.clear()
+        return
+
+    if message.text in TUGMA_MATNLARI:
+        await state.clear()
+        if message.text == "📝 Vazifa topshirish":
+            await vazifa_topshirish_boshlash(message, state)
+        elif message.text == "🎤 Qo'shimcha speaking tashlash":
+            await qoshimcha_speaking_boshlash(message, state)
+        elif message.text == "📋 Tugallanmagan vazifalar":
+            await tugallanmagan_vazifalar(message, state)
+        elif message.text == "📊 Natijam":
+            await natijam(message, state)
+        elif message.text == "🏆 Ranking":
+            await ranking(message, state)
+        elif message.text == "👤 Profilim":
+            await profilim(message, state)
+        return
+
+    text = message.text.strip()
+    if not text or len(text) < 3:
+        await message.answer("Iltimos, savolingizni to'liqroq yozing:")
+        return
+
+    await message.answer("🤔 O'ylayapman...")
+
+    try:
+        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi senga savol berdi.
+
+SAVOL: {text}
+
+Quyidagi TO'LIQ yordamni ber:
+
+1. 📝 TO'LIQ JAVOB
+2. 💡 IDEALAR — 4-5 ta fikr (ingliz tilida)
+3. 📚 YANGI SO'ZLAR — 5-7 ta (tarjimasi bilan)
+4. 🔗 COLLOCATIONS — to'g'ri birikmalar
+5. 📝 GRAMMAR — qoidalar
+6. ❓ QO'SHIMCHA SAVOLLAR — 2-3 ta
+7. ✅ TUSHUNARLI
+
+MUHIM: Har bo'lim oldiga emoji. Markdown belgilar ishlatma.
+O'zbek tilida yoz, misollar ingliz tilida."""
+
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        ai_javob = response.choices[0].message.content
+
+        if len(ai_javob) > 4000:
+            for i in range(0, len(ai_javob), 4000):
+                await message.answer(ai_javob[i:i+4000])
+        else:
+            await message.answer(f"🤖 AI JAVOBI:\n\n{ai_javob}")
+
+        await message.answer(
+            "✍️ Yana savolingiz bo'lsa yozing yoki 🔙 Ortga bosing."
+        )
+
+    except Exception as e:
+        logger.error(f"AI maslahat xatosi: {e}")
+        await message.answer(f"⚠️ Xatolik: {e}\n\nQayta urinib ko'ring.")
 
 
 # ==================== ASOSIY AUDIO QAYTA ISHLASH ====================
@@ -1389,73 +1459,6 @@ async def profilim(message: types.Message, state: FSMContext):
     )
 
 
-# ==================== AI SUHBAT (FAQAT SAVOLLARGA) ====================
-@dp.message(F.text & ~F.text.startswith('/'))
-async def ai_suhbat(message: types.Message, state: FSMContext):
-    if is_admin(message.from_user.id):
-        return
-
-    # Tugma matni bo'lsa — javob berma
-    if message.text in TUGMA_MATNLARI:
-        return
-
-    # State mavjud bo'lsa — javob berma
-    current_state = await state.get_state()
-    if current_state is not None:
-        return
-
-    user_id = str(message.from_user.id)
-    data = load_data()
-
-    if user_id not in data["students"]:
-        return
-
-    if not message.text or len(message.text) < 3:
-        return
-
-    text = message.text.strip()
-
-    # Faqat savollarga javob beradi
-    if not is_question(text):
-        return
-
-    await message.answer("🤔 O'ylayapman...")
-
-    try:
-        prompt = f"""Sen ingliz tili o'qituvchisisan. O'quvchi senga savol berdi.
-
-SAVOL: {text}
-
-Quyidagi TO'LIQ yordamni ber:
-
-1. 📝 TO'LIQ JAVOB
-2. 💡 IDEALAR — 4-5 ta fikr (ingliz tilida)
-3. 📚 YANGI SO'ZLAR — 5-7 ta (tarjimasi bilan)
-4. 🔗 COLLOCATIONS — to'g'ri birikmalar
-5. 📝 GRAMMAR — qoidalar
-6. ❓ QO'SHIMCHA SAVOLLAR — 2-3 ta
-7. ✅ TUSHUNARLI
-
-MUHIM: Har bo'lim oldiga emoji. Markdown belgilar ishlatma.
-O'zbek tilida yoz, misollar ingliz tilida."""
-
-        response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        ai_javob = response.choices[0].message.content
-
-        if len(ai_javob) > 4000:
-            for i in range(0, len(ai_javob), 4000):
-                await message.answer(ai_javob[i:i+4000])
-        else:
-            await message.answer(f"🤖 AI JAVOBI:\n\n{ai_javob}")
-
-    except Exception as e:
-        logger.error(f"AI suhbat xatosi: {e}")
-        await message.answer(f"⚠️ Xatolik: {e}")
-
-
 # ==================== TEST ====================
 @dp.message(Command("test"))
 async def test_groq(message: types.Message):
@@ -1558,3 +1561,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+        
