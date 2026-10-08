@@ -33,6 +33,7 @@ DEFAULT_DATA = {
     "pending_students": {},
     "tasks": {},
     "submissions": {},
+    "free_audios": {},
 }
 
 bot = Bot(token=TOKEN)
@@ -88,11 +89,16 @@ class AudioYuborish(StatesGroup):
     savol_raqami = State()
 
 
+class ErkinAudio(StatesGroup):
+    kutish = State()
+
+
 # ==================== MENYULAR ====================
 def oquvchi_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📝 Vazifa topshirish")],
+            [KeyboardButton(text="🎤 Erkin audio")],
             [KeyboardButton(text="📊 Natijam")],
             [KeyboardButton(text="🏆 Ranking")],
             [KeyboardButton(text="👤 Profilim")],
@@ -130,6 +136,14 @@ def ortga_menu():
     )
 
 
+# Filtrlash uchun tugma matnlari
+TUGMA_MATNLARI = {
+    "📝 Vazifa topshirish", "🎤 Erkin audio", "📊 Natijam", "🏆 Ranking", "👤 Profilim",
+    "📚 Vazifa berish", "📥 Kelgan javoblar", "👥 O'quvchilar", "📊 Statistika",
+    "🔙 Ortga", "✅ Yuborish", "❌ Bekor qilish",
+}
+
+
 # ==================== START ====================
 @dp.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
@@ -143,18 +157,21 @@ async def start_handler(message: types.Message, state: FSMContext):
     data = load_data()
     user_id_str = str(user_id)
 
-    if user_id_str in data["students"] and data["students"][user_id_str].get("ism"):
+    # Agar allaqachon tasdiqlangan o'quvchi bo'lsa — menyu ko'rsat
+    if user_id_str in data["students"]:
         student = data["students"][user_id_str]
         await message.answer(
-            f"Salom, {student['ism']}!\n\n🏫 Guruh: {student['guruh']}",
+            f"Salom, {student.get('ism', 'o\'quvchi')}!\n\n🏫 Guruh: {student.get('guruh', '—')}",
             reply_markup=oquvchi_menu(),
         )
         return
 
+    # Tasdiqlash kutilayotgan bo'lsa
     if user_id_str in data["pending_students"]:
         await message.answer("⏳ So'rovingiz admin tasdiqlashini kutmoqda.")
         return
 
+    # Yangi foydalanuvchi
     await message.answer(
         "👋 Salom! Botdan foydalanish uchun ro'yxatdan o'ting.\n\n"
         "1️⃣ Ism va familiyangizni yozing:"
@@ -167,10 +184,21 @@ async def royxat_ism(message: types.Message, state: FSMContext):
     if not message.text:
         await message.answer("Ism va familiyangizni matn ko'rinishida yozing:")
         return
+
     ism = message.text.strip()
+
+    # Tugma yoki komanda filtri
+    if ism in TUGMA_MATNLARI or ism.startswith("/"):
+        await message.answer(
+            "❗ Iltimos, ism-familiyangizni matn ko'rinishida yozing.\n"
+            "Masalan: Shohrux Karimov"
+        )
+        return
+
     if len(ism) < 3:
         await message.answer("To'liq ism va familiyangizni yozing:")
         return
+
     await state.update_data(ism=ism)
     await message.answer(f"✅ {ism}\n\n2️⃣ Guruhingizni yozing:")
     await state.set_state(Royxat.guruh)
@@ -181,7 +209,17 @@ async def royxat_guruh(message: types.Message, state: FSMContext):
     if not message.text:
         await message.answer("Guruh nomini yozing:")
         return
+
     guruh = message.text.strip()
+
+    # Tugma yoki komanda filtri
+    if guruh in TUGMA_MATNLARI or guruh.startswith("/"):
+        await message.answer(
+            "❗ Iltimos, guruh nomini matn ko'rinishida yozing.\n"
+            "Masalan: A1 guruh"
+        )
+        return
+
     if len(guruh) < 2:
         await message.answer("Guruh nomi juda qisqa:")
         return
@@ -249,7 +287,8 @@ async def approve_student(callback: types.CallbackQuery):
     try:
         await bot.send_message(
             int(user_id),
-            f"✅ So'rovingiz tasdiqlandi!\n\n👤 {student['ism']}\n🏫 {student['guruh']}",
+            f"✅ So'rovingiz tasdiqlandi!\n\n👤 {student['ism']}\n🏫 {student['guruh']}\n\n"
+            f"Endi botdan foydalanishingiz mumkin.",
             reply_markup=oquvchi_menu(),
         )
     except Exception as e:
@@ -290,6 +329,7 @@ async def reject_student(callback: types.CallbackQuery):
 async def vazifa_berish_boshlash(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
+    await state.clear()
     await message.answer(
         "📚 YANGI VAZIFA\n\n"
         "1️⃣ Vazifa nomini yozing:\n\nMasalan: Part 1.1",
@@ -458,6 +498,7 @@ async def vazifa_tasdiqlash(message: types.Message, state: FSMContext):
 async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
     if is_admin(message.from_user.id):
         return
+    await state.clear()
 
     data = load_data()
     user_id = str(message.from_user.id)
@@ -467,7 +508,10 @@ async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
         return
 
     if not data["tasks"]:
-        await message.answer("📚 Hozircha vazifalar yo'q.")
+        await message.answer(
+            "📚 Hozircha vazifalar yo'q.\n\n"
+            "🎤 'Erkin audio' tugmasi orqali xohlagan audioni yuborishingiz mumkin — AI tahlil qiladi."
+        )
         return
 
     text = "📝 VAZIFA TOPSHIRISH\n\nQaysi vazifani topshirmoqchisiz?\n\n"
@@ -563,12 +607,60 @@ async def audio_savol_raqami(message: types.Message, state: FSMContext):
         f"📌 {savol_raqami}-savol:\n\n"
         f"❓ {savol}\n\n"
         f"🎤 Endi audio javobingizni yuboring:\n"
-        f"(Qayta yuborish uchun yana audio tashlang — hisob yangilanadi)"
+        f"(Qayta yuborish uchun yana audio tashlang)"
     )
 
 
+# ==================== ERKIN AUDIO ====================
+@dp.message(F.text == "🎤 Erkin audio")
+async def erkin_audio_boshlash(message: types.Message, state: FSMContext):
+    if is_admin(message.from_user.id):
+        return
+    await state.clear()
+
+    data = load_data()
+    user_id = str(message.from_user.id)
+
+    if user_id not in data["students"]:
+        await message.answer("Avval /start bosing.")
+        return
+
+    await message.answer(
+        "🎤 ERKIN AUDIO\n\n"
+        "Xohlagan savolga yoki erkin mavzuda audio yuboring.\n"
+        "AI tahlil qiladi va foizda baho beradi.\n\n"
+        "🎤 Audioni yuboring:",
+        reply_markup=ortga_menu(),
+    )
+    await state.set_state(ErkinAudio.kutish)
+
+
+@dp.message(ErkinAudio.kutish, F.text)
+async def erkin_audio_text(message: types.Message, state: FSMContext):
+    if message.text == "🔙 Ortga":
+        await message.answer("⬅️ Bitta qadam orqaga qaytdingiz.", reply_markup=oquvchi_menu())
+        await state.clear()
+        return
+    await message.answer("🎤 Iltimos, audio (voice) yuboring:")
+
+
+@dp.message(ErkinAudio.kutish, F.voice)
+async def erkin_audio_qabul(message: types.Message, state: FSMContext):
+    user_id = str(message.from_user.id)
+    data = load_data()
+
+    if user_id not in data["students"]:
+        await message.answer("Avval /start bosing.")
+        await state.clear()
+        return
+
+    savol = "Erkin speaking (savolsiz)"
+    await process_audio(message, state, None, None, savol, None)
+
+
+# ==================== AUDIO QABUL (VAZIFA BILAN) ====================
 @dp.message(AudioYuborish.savol_raqami, F.voice)
-async def audio_qabul(message: types.Message, state: FSMContext):
+async def audio_qabul_vazifa(message: types.Message, state: FSMContext):
     user_id = str(message.from_user.id)
     data_user = await state.get_data()
     task_id = data_user.get("task_id")
@@ -580,12 +672,12 @@ async def audio_qabul(message: types.Message, state: FSMContext):
         return
 
     data = load_data()
-    if task_id not in data["tasks"]:
+    task = data["tasks"].get(task_id)
+    if not task:
         await message.answer("Vazifa topilmadi.")
         await state.clear()
         return
 
-    task = data["tasks"][task_id]
     savollar = task.get("savollar", [])
     if savol_raqami < 1 or savol_raqami > len(savollar):
         await message.answer("Savol raqami xato.")
@@ -593,9 +685,18 @@ async def audio_qabul(message: types.Message, state: FSMContext):
         return
 
     savol = savollar[savol_raqami - 1]
-    await message.answer(
-        f"⏳ {savol_raqami}-savol audio qabul qilindi. AI tahlil qilmoqda..."
-    )
+    await process_audio(message, state, task_id, savol_raqami, savol, task)
+
+
+# ==================== ASOSIY AUDIO QAYTA ISHLASH ====================
+async def process_audio(message, state, task_id, savol_raqami, savol, task):
+    user_id = str(message.from_user.id)
+    data = load_data()
+
+    if savol_raqami:
+        await message.answer(f"⏳ {savol_raqami}-savol audio qabul qilindi. AI tahlil qilmoqda...")
+    else:
+        await message.answer("⏳ Audio qabul qilindi. AI tahlil qilmoqda...")
 
     try:
         file = await bot.get_file(message.voice.file_id)
@@ -688,39 +789,55 @@ MUHIM:
     else:
         ball = 0.0
 
-    if task_id not in data["submissions"]:
-        data["submissions"][task_id] = {}
-    if user_id not in data["submissions"][task_id]:
-        data["submissions"][task_id][user_id] = {"audios": {}}
+    # Saqlash
+    if task_id is not None:
+        if task_id not in data["submissions"]:
+            data["submissions"][task_id] = {}
+        if user_id not in data["submissions"][task_id]:
+            data["submissions"][task_id][user_id] = {"audios": {}}
 
-    data["submissions"][task_id][user_id]["audios"][str(savol_raqami)] = {
-        "audio_file_id": message.voice.file_id,
-        "submitted_at": now_str(),
-        "ai_tahlil": ai_tahlil,
-        "overall": overall,
-        "ball": ball,
-        "savol": savol,
-    }
+        data["submissions"][task_id][user_id]["audios"][str(savol_raqami)] = {
+            "audio_file_id": message.voice.file_id,
+            "submitted_at": now_str(),
+            "ai_tahlil": ai_tahlil,
+            "overall": overall,
+            "ball": ball,
+            "savol": savol,
+        }
 
-    total_ball = sum(
-        a.get("ball", 0)
-        for a in data["submissions"][task_id][user_id]["audios"].values()
-    )
-    data["submissions"][task_id][user_id]["total_ball"] = total_ball
-
-    if user_id in data["students"]:
-        data["students"][user_id]["ball"] = total_ball
+        total_ball = sum(
+            a.get("ball", 0)
+            for a in data["submissions"][task_id][user_id]["audios"].values()
+        )
+        data["submissions"][task_id][user_id]["total_ball"] = total_ball
+        if user_id in data["students"]:
+            data["students"][user_id]["ball"] = total_ball
+    else:
+        # Erkin audio
+        if user_id not in data["free_audios"]:
+            data["free_audios"][user_id] = {}
+        eid = str(len(data["free_audios"][user_id]) + 1)
+        data["free_audios"][user_id][eid] = {
+            "audio_file_id": message.voice.file_id,
+            "submitted_at": now_str(),
+            "ai_tahlil": ai_tahlil,
+            "overall": overall,
+            "ball": ball,
+        }
 
     save_data(data)
 
     ism = data["students"][user_id].get("ism", "Nomalum")
     guruh = data["students"][user_id].get("guruh", "—")
 
-    header = f"🤖 AI TAHLIL — {savol_raqami}-savol\n\n"
+    header = "🤖 AI TAHLIL\n\n"
+    if savol_raqami:
+        header = f"🤖 AI TAHLIL — {savol_raqami}-savol\n\n"
     full_text = header + ai_tahlil
-    full_text += f"\n\n📊 UMUMIY BAHO: {overall}%\n"
-    full_text += f"🎯 Bu audio uchun ball: {ball}\n"
-    full_text += f"💰 Vazifadagi jami ball: {total_ball}/{task.get('savollar_soni', 0)}"
+    full_text += f"\n\n📊 UMUMIY BAHO: {overall}%"
+    if task_id is not None:
+        full_text += f"\n🎯 Bu audio uchun ball: {ball}"
+        full_text += f"\n💰 Vazifadagi jami ball: {data['submissions'][task_id][user_id].get('total_ball', 0)}/{task.get('savollar_soni', 0)}"
 
     if len(full_text) > 4000:
         for i in range(0, len(full_text), 4000):
@@ -728,17 +845,31 @@ MUHIM:
     else:
         await message.answer(full_text)
 
-    await message.answer(
-        f"✅ {savol_raqami}-savol qabul qilindi!\n\n"
-        f"🎤 Boshqa savolga audio tashlang yoki qayta yuborish uchun yana audio tashlang.",
-        reply_markup=oquvchi_menu(),
-    )
+    if task_id is not None:
+        await message.answer(
+            f"✅ {savol_raqami}-savol qabul qilindi!\n\n"
+            f"🎤 Boshqa savolga audio tashlang yoki qayta yuborish uchun yana audio tashlang.",
+            reply_markup=oquvchi_menu(),
+        )
+    else:
+        await message.answer(
+            "✅ Audio qabul qilindi!\n\n"
+            "🎤 Yana audio tashlashingiz mumkin.",
+            reply_markup=oquvchi_menu(),
+        )
 
+    # Adminga xabar
     try:
+        if task_id is not None:
+            task_name = task['nomi'] if task else "—"
+            info = f"📚 {task_name} — {savol_raqami}-savol"
+        else:
+            info = "🎤 Erkin audio"
+
         await bot.send_message(
             ADMIN_ID,
             f"📥 YANGI AUDIO!\n\n👤 {ism} ({guruh})\n"
-            f"📚 {task['nomi']} — {savol_raqami}-savol\n"
+            f"{info}\n"
             f"⏰ {now_str()}\n"
             f"📊 Overall: {overall}% | Ball: {ball}",
         )
@@ -754,12 +885,13 @@ async def kelgan_javoblar(message: types.Message):
         return
 
     data = load_data()
-    if not data["submissions"]:
+    if not data["submissions"] and not data.get("free_audios"):
         await message.answer("📥 Hozircha javoblar yo'q.")
         return
 
     text = "📥 KELGAN JAVOBLAR\n\n"
     count = 0
+
     for task_id, subs in data["submissions"].items():
         task_name = data["tasks"].get(task_id, {}).get("nomi", "Nomalum")
         max_ball = data["tasks"].get(task_id, {}).get("savollar_soni", 0)
@@ -823,13 +955,15 @@ async def admin_statistika(message: types.Message):
         for subs in data["submissions"].values()
         for sub in subs.values()
     )
+    free_audios = sum(len(v) for v in data.get("free_audios", {}).values())
 
     text = (
         f"📊 STATISTIKA\n\n"
         f"👥 O'quvchilar: {total_students}\n"
         f"⏳ Kutilayotgan: {total_pending}\n"
         f"📚 Vazifalar: {total_tasks}\n"
-        f"🎤 Jami audiolar: {total_audios}\n"
+        f"🎤 Vazifa audiolari: {total_audios}\n"
+        f"🎤 Erkin audiolar: {free_audios}\n"
     )
     await message.answer(text)
 
@@ -856,6 +990,10 @@ async def natijam(message: types.Message):
         total = sub.get("total_ball", 0)
         if audios:
             text += f"📚 {task['nomi']}: {total}/{max_b} ball ({len(audios)} audio)\n"
+
+    free_count = len(data.get("free_audios", {}).get(user_id, {}))
+    if free_count:
+        text += f"🎤 Erkin audiolar: {free_count} ta\n"
 
     text += f"\n💰 UMUMIY BALL: {s.get('ball', 0)}"
     await message.answer(text)
