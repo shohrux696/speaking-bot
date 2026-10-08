@@ -730,15 +730,16 @@ async def audio_qabul(message: types.Message, state: FSMContext):
 
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     try:
-        prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
+                prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
 O'quvchi speaking topshirig'ini bajardi.
 
 SAVOL: {task['savol']}
 
-Quyidagi audioni TO'LIQ va TABIIY tahlil qil. Har bir bo'limda emoji ishlatilsin.
+Quyidagi audioni TO'LIQ va TABIIY tahlil qil. O'quvchiga do'stona va iliq munosabatda bo'l.
 O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
 
-1. 📝 TRANSCRIPT — so'zma-so'z yoz
+1. 📝 TRANSCRIPT — o'quvchi aytgan gaplarni so'zma-so'z yoz
+
 2. 📊 BAHO — foizda:
 🎯 Accuracy: X%
 📚 Vocabulary: X%
@@ -746,18 +747,40 @@ O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
 📖 Grammar: X%
 🔊 Pronunciation: X%
 ⭐ Overall: X%
-3. 📝 IZOH — ✅ Kuchli, ⚠️ O'rtacha, ❌ Zaif
-4. ❌ GRAMMAR — xato → to'g'ri
-5. 📚 VOCABULARY — oddiy → kuchli
-6. 🔗 COLLOCATIONS — to'g'ri/noto'g'ri
-7. 📍 PREPOSITIONS — xato → to'g'ri
-8. 🗣 FLUENCY — pauzalar, filler words
-9. 🧠 CONTENT — to'liq javob
-10. ✨ IMPROVED VERSION — yaxshilangan
-11. 🎯 SAMPLE ANSWER — IELTS 8+ namuna
-12. 💡 TAVSIYA — 3-5 maslahat
 
-MUHIM: Har bo'lim oldiga emoji. Markdown belgilar ishlatma.
+3. 📝 IZOH — quyidagi tarzda:
+✅ Zo'r tomonlaringiz:
+- [yaxshi tomonlar]
+⚠️ Yaxshilash mumkin:
+- [o'rtacha tomonlar]
+❌ Bu joylarga e'tibor bering:
+- [zaif tomonlar]
+
+4. ❌ GRAMMAR — xato → to'g'ri (yumshoq ohangda)
+
+5. 📚 VOCABULARY — oddiy → kuchli variantlar
+
+6. 🔗 COLLOCATIONS — to'g'ri/noto'g'ri
+
+7. 📍 PREPOSITIONS — xato → to'g'ri
+
+8. 🗣 FLUENCY — pauzalar, filler words
+
+9. 🧠 CONTENT — javob to'liqligi
+
+10. ✨ IMPROVED VERSION — o'quvchining speaking'ini to'liq yaxshilangan holda qayta yoz (IELTS 8+ darajada). O'quvchining o'z mazmuni saqlansin, lekin grammatika, vocabulary va ravonlik yaxshilansin.
+
+11. 💡 TAVSIYA — 3-5 ta maslahat
+
+MUHIM:
+- Tabiiy, jonli tilda yoz (robot kabi emas)
+- O'quvchiga do'stona va samimiy munosabatda bo'l
+- "Siz" deb murojaat qil, lekin rasmiy emas, iliq ohangda
+- Har bir bo'lim oldiga mos emoji qo'y
+- Xatolarni aytganda, "xato" emas, "yaxshilash mumkin" deb yoz
+- Maqtashni unutma: "Yaxshi harakat!", "Zo'r!", "Davom eting!" kabi
+- Oxirida o'quvchini rag'batlantir
+- Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
 O'zbek tilida yoz. Qisqa va aniq."""
 
         tr = groq_client.audio.transcriptions.create(
