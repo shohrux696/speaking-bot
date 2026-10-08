@@ -754,8 +754,7 @@ O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
 8. 🗣 FLUENCY — pauzalar, filler words
 9. 🧠 CONTENT — to'liq javob
 10. ✨ IMPROVED VERSION — yaxshilangan
-11. 🎯 SAMPLE ANSWER — IELTS 8+ namuna
-12. 💡 TAVSIYA — 3-5 maslahat
+11. 💡 TAVSIYA — 3-5 maslahat
 
 MUHIM: Har bo'lim oldiga emoji. Markdown belgilar ishlatma.
 O'zbek tilida yoz. Qisqa va aniq."""
