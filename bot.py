@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-DATA_FILE = "data.json"
+DATA_FILE = "/data/data.json"
 
 DEFAULT_DATA = {
     "students": {},
@@ -730,7 +730,7 @@ async def audio_qabul(message: types.Message, state: FSMContext):
 
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     try:
-                prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
+        prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
 O'quvchi speaking topshirig'ini bajardi.
 
 SAVOL: {task['savol']}
@@ -848,7 +848,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
     await state.clear()
 
 
-# ==================== ADMIN: KELGAN JAVOBLAR (YANGI) ====================
+# ==================== ADMIN: KELGAN JAVOBLAR ====================
 @dp.message(F.text == "📥 Kelgan javoblar")
 async def kelgan_javoblar(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -1111,9 +1111,8 @@ async def test_groq(message: types.Message):
         await message.answer(f"❌ Groq xatosi:\n\n{e}")
 
 
-# ==================== DEADLINE WARNING (YANGI) ====================
+# ==================== DEADLINE WARNING ====================
 async def deadline_warning():
-    """Har daqiqada deadline larni tekshiradi va ogohlantiradi"""
     while True:
         try:
             now = datetime.now()
