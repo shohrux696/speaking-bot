@@ -8,9 +8,6 @@ primary_region = "fra"
   size = "shared-cpu-1x"
   memory = "512mb"
 
-[[mounts]]
-  source = "data"
-  destination = "/data"
 
 [env]
   PORT = "8080"
