@@ -151,13 +151,27 @@ def ortga_menu():
     )
 
 
+# ==================== TUGMA MATNLARI (MUHIM!) ====================
+# AI suhbat bu tugmalarga javob BERMAYDI
 TUGMA_MATNLARI = {
-    "📝 Vazifa topshirish", "🎤 Qo'shimcha speaking tashlash",
+    # O'quvchi menyusi
+    "📝 Vazifa topshirish",
+    "🎤 Qo'shimcha speaking tashlash",
     "📋 Tugallanmagan vazifalar",
-    "📊 Natijam", "🏆 Ranking", "👤 Profilim",
-    "📚 Vazifa berish", "📥 Kelgan javoblar", "👥 O'quvchilar", "📊 Statistika",
-    "🗑 Vazifani o'chirish", "🗑 O'quvchini o'chirish",
-    "🔙 Ortga", "✅ Yuborish", "❌ Bekor qilish",
+    "📊 Natijam",
+    "🏆 Ranking",
+    "👤 Profilim",
+    # Admin menyusi
+    "📚 Vazifa berish",
+    "📥 Kelgan javoblar",
+    "👥 O'quvchilar",
+    "📊 Statistika",
+    "🗑 Vazifani o'chirish",
+    "🗑 O'quvchini o'chirish",
+    # Umumiy
+    "🔙 Ortga",
+    "✅ Yuborish",
+    "❌ Bekor qilish",
 }
 
 
@@ -624,7 +638,7 @@ async def tugallanmagan_vazifalar(message: types.Message, state: FSMContext):
         return
 
     if not data["tasks"]:
-        await message.answer("📚 Hozircha vazifalar yo'q.")
+        await message.answer("📚 Hozircha vazifalar yo'q.", reply_markup=oquvchi_menu())
         return
 
     tugallanmagan = []
@@ -636,21 +650,23 @@ async def tugallanmagan_vazifalar(message: types.Message, state: FSMContext):
             tugallanmagan.append((tid, task, len(audios), savollar_soni))
 
     if not tugallanmagan:
-        await message.answer("✅ Sizda tugallanmagan vazifalar yo'q!\n\nBarcha vazifalarni topshirgansiz.")
+        await message.answer(
+            "✅ Sizda tugallanmagan vazifalar yo'q!\n\nBarcha vazifalarni topshirgansiz.",
+            reply_markup=oquvchi_menu(),
+        )
         return
 
     text = f"📋 TUGALLANMAGAN VAZIFALAR ({len(tugallanmagan)} ta)\n\n"
     for tid, task, done, total in tugallanmagan:
-        progress = "🟩" * done + "⬜" * (total - done)
         text += f"📚 {tid}. {task['nomi']}\n"
-        text += f"   {progress} {done}/{total}\n"
+        text += f"   🎤 {done}/{total} audio\n"
         text += f"   ⏰ {task['deadline']}\n\n"
 
     text += "Topshirish uchun '📝 Vazifa topshirish' tugmasini bosing."
     await message.answer(text, reply_markup=oquvchi_menu())
 
 
-# ==================== O'QUVCHI: VAZIFA TOPSHIRISH ====================
+# ==================== O'QUVCHI: VAZIFA TOPSHIRISH (AI JAVOB YO'Q!) ====================
 @dp.message(F.text == "📝 Vazifa topshirish")
 async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
     if is_admin(message.from_user.id):
@@ -666,11 +682,12 @@ async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
     if not data["tasks"]:
         await message.answer(
             "📚 Hozircha vazifalar yo'q.\n\n"
-            "🎤 'Qo'shimcha speaking tashlash' tugmasi orqali audio yuboring."
+            "🎤 'Qo'shimcha speaking tashlash' tugmasi orqali audio yuboring.",
+            reply_markup=oquvchi_menu(),
         )
         return
 
-    # AI javob yo'q — faqat ro'yxat ketma-ket
+    # FAQAT vazifalar ro'yxati — AI javob YO'Q
     text = "📋 VAZIFALAR RO'YXATI\n\n"
     for tid, task in sorted(data["tasks"].items(), key=lambda x: int(x[0]) if x[0].isdigit() else 0):
         sub = data["submissions"].get(tid, {}).get(user_id, {})
@@ -694,7 +711,6 @@ async def task_tanlash(message: types.Message, state: FSMContext):
 
     if message.text in TUGMA_MATNLARI:
         await state.clear()
-        # Tugmalarni qayta ishlash
         if message.text == "📝 Vazifa topshirish":
             await vazifa_topshirish_boshlash(message, state)
         elif message.text == "🎤 Qo'shimcha speaking tashlash":
@@ -731,9 +747,9 @@ async def task_tanlash(message: types.Message, state: FSMContext):
     text += f"❓ Savollar ({len(savollar)} ta):\n\n"
     for i, savol in enumerate(savollar, 1):
         status = "🟢 Yuborilgan" if str(i) in audios else "🔴 Yuborilmagan"
-        text += f"{i}. {savol} — {status}\n"
+        text += f"{i}. {savol}\n   {status}\n\n"
 
-    text += f"\n🎤 Qaysi savolga audio yubormoqchisiz?\n"
+    text += f"🎤 Qaysi savolga audio yubormoqchisiz?\n"
     text += f"Savol raqamini yozing (1-{len(savollar)}):"
 
     await state.update_data(task_id=task_id)
@@ -744,7 +760,6 @@ async def task_tanlash(message: types.Message, state: FSMContext):
 @dp.message(VazifaTopshirish.savol_tanlash, F.text)
 async def savol_tanlash(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
-        # Bitta qadam orqaga — vazifa tanlashga
         data = load_data()
         user_id = str(message.from_user.id)
         text = "📋 VAZIFALAR RO'YXATI\n\n"
@@ -815,7 +830,6 @@ async def savol_tanlash(message: types.Message, state: FSMContext):
 @dp.message(VazifaTopshirish.audio_kutish, F.text)
 async def audio_kutish_text(message: types.Message, state: FSMContext):
     if message.text == "🔙 Ortga":
-        # Bitta qadam orqaga — savol tanlashga
         data_user = await state.get_data()
         task_id = data_user.get("task_id")
         data = load_data()
@@ -831,8 +845,8 @@ async def audio_kutish_text(message: types.Message, state: FSMContext):
             text += f"❓ Savollar ({len(savollar)} ta):\n\n"
             for i, savol in enumerate(savollar, 1):
                 status = "🟢 Yuborilgan" if str(i) in audios else "🔴 Yuborilmagan"
-                text += f"{i}. {savol} — {status}\n"
-            text += f"\n🎤 Savol raqamini yozing (1-{len(savollar)}):"
+                text += f"{i}. {savol}\n   {status}\n\n"
+            text += f"🎤 Savol raqamini yozing (1-{len(savollar)}):"
 
             await message.answer("⬅️ Bitta qadam orqaga.\n\n" + text, reply_markup=ortga_menu())
             await state.set_state(VazifaTopshirish.savol_tanlash)
@@ -1040,7 +1054,6 @@ MUHIM:
         logger.error(f"Groq xatosi: {e}")
         ai_tahlil = "⚠️ AI tahlil qilishda xatolik. Keyinroq qayta urinib ko'ring."
 
-    # Ball hisoblash
     if overall >= 60:
         ball = 1.0
     elif overall >= 50:
@@ -1338,16 +1351,17 @@ async def profilim(message: types.Message, state: FSMContext):
     )
 
 
-# ==================== AI SUHBAT ====================
+# ==================== AI SUHBAT (FAQAT STATE YO'Q BO'LGANDA) ====================
 @dp.message(F.text & ~F.text.startswith('/'))
 async def ai_suhbat(message: types.Message, state: FSMContext):
     if is_admin(message.from_user.id):
         return
 
+    # Tugma matni bo'lsa — javob berma
     if message.text in TUGMA_MATNLARI:
         return
 
-    # Faqat state yo'q bo'lganda ishlaydi
+    # State mavjud bo'lsa — javob berma
     current_state = await state.get_state()
     if current_state is not None:
         return
@@ -1415,7 +1429,6 @@ async def test_groq(message: types.Message):
 
 # ==================== DEADLINE WARNING ====================
 async def deadline_warning():
-    """Har daqiqada deadline larni tekshiradi va ogohlantiradi"""
     while True:
         try:
             now = datetime.now()
