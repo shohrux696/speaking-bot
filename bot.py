@@ -825,7 +825,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
     await state.clear()
 
 
-# ==================== ADMIN: KELGAN JAVOBLAR ====================
+# ==================== ADMIN: KELGAN JAVOBLAR (YANGI) ====================
 @dp.message(F.text == "📥 Kelgan javoblar")
 async def kelgan_javoblar(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -1088,8 +1088,9 @@ async def test_groq(message: types.Message):
         await message.answer(f"❌ Groq xatosi:\n\n{e}")
 
 
-# ==================== DEADLINE WARNING ====================
+# ==================== DEADLINE WARNING (YANGI) ====================
 async def deadline_warning():
+    """Har daqiqada deadline larni tekshiradi va ogohlantiradi"""
     while True:
         try:
             now = datetime.now()
