@@ -730,13 +730,13 @@ async def audio_qabul(message: types.Message, state: FSMContext):
 
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     try:
-        prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
+             prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
 O'quvchi speaking topshirig'ini bajardi.
 
 SAVOL: {task['savol']}
 
 Quyidagi audioni TO'LIQ va TABIIY tahlil qil. O'quvchiga do'stona va iliq munosabatda bo'l.
-O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
+BARCHA IZOHLAR O'ZBEK TILIDA BO'LISHI SHART! Faqat ingliz tilidagi misollar (grammar, vocabulary) ingliz tilida bo'lsin.
 
 1. 📝 TRANSCRIPT — o'quvchi aytgan gaplarni so'zma-so'z yoz
 
@@ -748,7 +748,7 @@ O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
 🔊 Pronunciation: X%
 ⭐ Overall: X%
 
-3. 📝 IZOH — quyidagi tarzda:
+3. 📝 IZOH — O'ZBEK TILIDA:
 ✅ Zo'r tomonlaringiz:
 - [yaxshi tomonlar]
 ⚠️ Yaxshilash mumkin:
@@ -756,23 +756,24 @@ O'zbek tilida yoz, lekin misollar ingliz tilida bo'lsin.
 ❌ Bu joylarga e'tibor bering:
 - [zaif tomonlar]
 
-4. ❌ GRAMMAR — xato → to'g'ri (yumshoq ohangda)
+4. ❌ GRAMMAR — xato → to'g'ri (yumshoq ohangda, o'zbek tilida izoh)
 
-5. 📚 VOCABULARY — oddiy → kuchli variantlar
+5. 📚 VOCABULARY — oddiy → kuchli variantlar (o'zbek tilida izoh)
 
-6. 🔗 COLLOCATIONS — to'g'ri/noto'g'ri
+6. 🔗 COLLOCATIONS — to'g'ri/noto'g'ri (o'zbek tilida)
 
-7. 📍 PREPOSITIONS — xato → to'g'ri
+7. 📍 PREPOSITIONS — xato → to'g'ri (o'zbek tilida)
 
-8. 🗣 FLUENCY — pauzalar, filler words
+8. 🗣 FLUENCY — pauzalar, filler words (o'zbek tilida)
 
-9. 🧠 CONTENT — javob to'liqligi
+9. 🧠 CONTENT — javob to'liqligi (o'zbek tilida)
 
-10. ✨ IMPROVED VERSION — o'quvchining speaking'ini to'liq yaxshilangan holda qayta yoz (IELTS 8+ darajada). O'quvchining o'z mazmuni saqlansin, lekin grammatika, vocabulary va ravonlik yaxshilansin.
+10. ✨ IMPROVED VERSION — o'quvchining speaking'ini to'liq yaxshilangan holda qayta yoz (IELTS 8+ darajada). Bu ingliz tilida bo'lsin.
 
-11. 💡 TAVSIYA — 3-5 ta maslahat
+11. 💡 TAVSIYA — 3-5 ta maslahat (o'zbek tilida)
 
 MUHIM:
+- BARCHA IZOHLAR O'ZBEK TILIDA!
 - Tabiiy, jonli tilda yoz (robot kabi emas)
 - O'quvchiga do'stona va samimiy munosabatda bo'l
 - "Siz" deb murojaat qil, lekin rasmiy emas, iliq ohangda
@@ -782,7 +783,6 @@ MUHIM:
 - Oxirida o'quvchini rag'batlantir
 - Markdown belgilar ishlatma. Faqat emoji va oddiy matn.
 O'zbek tilida yoz. Qisqa va aniq."""
-
         tr = groq_client.audio.transcriptions.create(
             file=("audio.ogg", audio_data),
             model="whisper-large-v3-turbo",
@@ -1069,12 +1069,11 @@ Quyidagi TO'LIQ yordamni ber:
 
 1. 📝 TO'LIQ JAVOB
 2. 💡 IDEALAR — 4-5 ta fikr (ingliz tilida)
-3. 📚 YANGI SO'ZLAR — 5-7 ta (tarjimasi bilan)
+3. 📚 YANGI SO'ZLAR — 3-4 ta (tarjimasi bilan)
 4. 🔗 COLLOCATIONS — to'g'ri birikmalar
 5. 📝 GRAMMAR — qoidalar
 6. ❓ QO'SHIMCHA SAVOLLAR — 2-3 ta
-7. 🎯 SAMPLE ANSWER — IELTS 8+ namuna
-8. ✅ TUSHUNARLI
+7. ✅ TUSHUNARLI
 
 MUHIM: Har bo'lim oldiga emoji. Markdown belgilar ishlatma.
 O'zbek tilida yoz, misollar ingliz tilida."""
