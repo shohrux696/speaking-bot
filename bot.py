@@ -825,7 +825,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
     await state.clear()
 
 
-# ==================== ADMIN: KELGAN JAVOBLAR (YANGI) ====================
+# ==================== ADMIN: KELGAN JAVOBLAR ====================
 @dp.message(F.text == "📥 Kelgan javoblar")
 async def kelgan_javoblar(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -833,7 +833,6 @@ async def kelgan_javoblar(message: types.Message):
 
     data = load_data()
 
-    # Barcha baholanmagan javoblar
     pending_list = []
     evaluated_list = []
 
@@ -1089,9 +1088,8 @@ async def test_groq(message: types.Message):
         await message.answer(f"❌ Groq xatosi:\n\n{e}")
 
 
-# ==================== DEADLINE WARNING (YANGI) ====================
+# ==================== DEADLINE WARNING ====================
 async def deadline_warning():
-    """Har daqiqada deadline larni tekshiradi va ogohlantiradi"""
     while True:
         try:
             now = datetime.now()
@@ -1110,70 +1108,41 @@ async def deadline_warning():
                 time_left = deadline - now
                 hours_left = time_left.total_seconds() / 3600
 
-                # 24 soat qolganda
-                if 0 < hours_left <= 24:
-                    key_24 = f"{tid}_24"
-                    if key_24 not in data["warnings"]:
-                        data["warnings"][key_24] = True
-                        await send_deadline_warning(data, tid, task, "⏰ 24 soat qoldi!")
-                        save_data(data)
+                warning_times = [
+                    (24, "⏰ 24 soat qoldi!"),
+                    (12, "⚠️ 12 soat qoldi!"),
+                    (6, "🔔 6 soat qoldi!"),
+                    (2, "🔴 2 soat qoldi!"),
+                    (1, "🚨 1 soat qoldi!"),
+                ]
 
-                # 12 soat qolganda
-                if 0 < hours_left <= 12:
-                    key_12 = f"{tid}_12"
-                    if key_12 not in data["warnings"]:
-                        data["warnings"][key_12] = True
-                        await send_deadline_warning(data, tid, task, "⚠️ 12 soat qoldi!")
-                        save_data(data)
-
-                # 6 soat qolganda
-                if 0 < hours_left <= 6:
-                    key_6 = f"{tid}_6"
-                    if key_6 not in data["warnings"]:
-                        data["warnings"][key_6] = True
-                        await send_deadline_warning(data, tid, task, "🔔 6 soat qoldi!")
-                        save_data(data)
-
-                # 2 soat qolganda
-                if 0 < hours_left <= 2:
-                    key_2 = f"{tid}_2"
-                    if key_2 not in data["warnings"]:
-                        data["warnings"][key_2] = True
-                        await send_deadline_warning(data, tid, task, "🔴 2 soat qoldi!")
-                        save_data(data)
-
-                # 1 soat qolganda
-                if 0 < hours_left <= 1:
-                    key_1 = f"{tid}_1"
-                    if key_1 not in data["warnings"]:
-                        data["warnings"][key_1] = True
-                        await send_deadline_warning(data, tid, task, "🚨 1 soat qoldi!")
-                        save_data(data)
+                for warn_hour, warn_text in warning_times:
+                    key = f"{tid}_{warn_hour}"
+                    if key not in data["warnings"]:
+                        if 0 < hours_left <= warn_hour:
+                            data["warnings"][key] = True
+                            for uid, info in data["students"].items():
+                                submitted = data["submissions"].get(tid, {})
+                                if uid not in submitted:
+                                    try:
+                                        await bot.send_message(
+                                            int(uid),
+                                            f"🔔 {warn_text}\n\n"
+                                            f"👤 {info.get('ism', 'o\'quvchi')},\n"
+                                            f"📚 Sizda tugallanmagan topshiriq bor:\n\n"
+                                            f"📝 {tid}. {task['nomi']}\n"
+                                            f"❓ {task['savol']}\n"
+                                            f"⏰ Deadline: {task['deadline']}\n\n"
+                                            f"⚠️ Iltimos, vaqtida topshiring!",
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"Ogohlantirish xatosi {uid}: {e}")
+                            save_data(data)
 
             await asyncio.sleep(60)
         except Exception as e:
             logger.error(f"Deadline warning xatosi: {e}")
             await asyncio.sleep(60)
-
-
-async def send_deadline_warning(data, tid, task, warn_text):
-    """Deadline ogohlantirishini yuborish"""
-    for uid, info in data["students"].items():
-        submitted = data["submissions"].get(tid, {})
-        if uid not in submitted:
-            try:
-                await bot.send_message(
-                    int(uid),
-                    f"🔔 {warn_text}\n\n"
-                    f"👤 {info.get('ism', 'o\'quvchi')},\n"
-                    f"📚 Sizda tugallanmagan topshiriq bor:\n\n"
-                    f"📝 {tid}. {task['nomi']}\n"
-                    f"❓ {task['savol']}\n"
-                    f"⏰ Deadline: {task['deadline']}\n\n"
-                    f"⚠️ Iltimos, vaqtida topshiring!",
-                )
-            except Exception as e:
-                logger.error(f"Ogohlantirish xatosi {uid}: {e}")
 
 
 # ==================== WEB SERVER ====================
