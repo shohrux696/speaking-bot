@@ -647,9 +647,7 @@ BARCHA IZOHLAR O'ZBEK TILIDA BO'LISHI SHART! Faqat ingliz tilidagi misollar ingl
 
 9. 🧠 CONTENT — javob to'liqligi
 
-10. ✨ IMPROVED VERSION — o'quvchining speaking'ini IELTS 8+ darajada qayta yoz
-
-11. 💡 TAVSIYA — 3-5 ta maslahat
+10. 💡 TAVSIYA — 3-5 ta maslahat
 
 MUHIM:
 - BARCHA IZOHLAR O'ZBEK TILIDA!
