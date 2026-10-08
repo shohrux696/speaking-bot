@@ -76,17 +76,14 @@ def now_str():
 
 # ==================== SAVOL ANIQLASH ====================
 def is_question(text: str) -> bool:
-    """Matn savol shaklidami?"""
     if not text:
         return False
 
     text_lower = text.lower().strip()
 
-    # 1. Savol belgisi
     if "?" in text:
         return True
 
-    # 2. Ingliz savol so'zlari
     en_q_words = [
         "what", "how", "why", "when", "where", "which", "who", "whom", "whose",
         "can", "could", "should", "would", "will", "shall", "may", "might",
@@ -94,12 +91,10 @@ def is_question(text: str) -> bool:
         "have", "has", "had", "explain", "tell me", "help me",
     ]
 
-    # Ingliz savol so'zi bilan boshlanadi
     for w in en_q_words:
         if text_lower.startswith(w + " ") or text_lower == w:
             return True
 
-    # 3. O'zbek savol so'zlari
     uz_q_words = [
         "nima", "qanday", "nega", "qachon", "qayerda", "qaysi", "kim", "kimning",
         "nechta", "qancha", "mumkinmi", "kerakmi", "bormi", "yo'qmi", "tushuntir",
@@ -111,7 +106,6 @@ def is_question(text: str) -> bool:
         if w in text_lower:
             return True
 
-    # 4. "mi" bilan tugaydi (o'zbek savol)
     if text_lower.endswith("mi") or text_lower.endswith("mi?"):
         return True
 
@@ -399,7 +393,7 @@ async def reject_student(callback: types.CallbackQuery):
     await callback.answer("Rad etildi!")
 
 
-# ==================== ADMIN: VAZIFA BERISH (KO'P SAVOLLI) ====================
+# ==================== ADMIN: VAZIFA BERISH ====================
 @dp.message(F.text == "📚 Vazifa berish")
 async def vazifa_berish_boshlash(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
@@ -731,6 +725,7 @@ async def vazifa_topshirish_boshlash(message: types.Message, state: FSMContext):
         )
         return
 
+    # Faqat vazifalar ro'yxati — AI javob YO'Q
     text = "📋 VAZIFALAR RO'YXATI\n\n"
     for tid, task in sorted(data["tasks"].items(), key=lambda x: int(x[0]) if x[0].isdigit() else 0):
         sub = data["submissions"].get(tid, {}).get(user_id, {})
@@ -1412,7 +1407,6 @@ async def ai_suhbat(message: types.Message, state: FSMContext):
     user_id = str(message.from_user.id)
     data = load_data()
 
-    # O'quvchi tasdiqlangan bo'lishi shart
     if user_id not in data["students"]:
         return
 
@@ -1421,7 +1415,7 @@ async def ai_suhbat(message: types.Message, state: FSMContext):
 
     text = message.text.strip()
 
-    # ⚠️ FAQAT SAVOLLARGA JAVOB BERADI
+    # Faqat savollarga javob beradi
     if not is_question(text):
         return
 
