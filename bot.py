@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# Render'da /data papkasi mavjud emas, shuning uchun oddiy fayl
+# Render'da /data papkasi ishlamaydi, shuning uchun oddiy fayl
 DATA_FILE = "data.json"
 
 DEFAULT_DATA = {
@@ -85,6 +85,14 @@ class AudioYuborish(StatesGroup):
     savol_raqami = State()
 
 
+class VazifaOchirish(StatesGroup):
+    vazifa_id = State()
+
+
+class OquvchiOchirish(StatesGroup):
+    user_id = State()
+
+
 # ==================== MENYULAR ====================
 def oquvchi_menu():
     return ReplyKeyboardMarkup(
@@ -143,7 +151,6 @@ async def start_handler(message: types.Message, state: FSMContext):
     data = load_data()
     user_id_str = str(user_id)
 
-    # Agar allaqachon ro'yxatdan o'tgan bo'lsa - menyuni ko'rsat
     if user_id_str in data["students"] and data["students"][user_id_str].get("ism"):
         student = data["students"][user_id_str]
         await message.answer(
@@ -152,12 +159,10 @@ async def start_handler(message: types.Message, state: FSMContext):
         )
         return
 
-    # Agar so'rov yuborilgan bo'lsa - kutish
     if user_id_str in data["pending_students"]:
         await message.answer("⏳ Sizning so'rovingiz admin tasdiqlashini kutmoqda.")
         return
 
-    # Yangi ro'yxatdan o'tish
     await message.answer(
         "👋 Salom! Botdan foydalanish uchun ro'yxatdan o'ting.\n\n"
         "1️⃣ Ism va familiyangizni yozing:"
