@@ -741,6 +741,7 @@ async def audio_qabul(message: types.Message, state: FSMContext):
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     overall = 0
     try:
+        # PROMPT YANGILANDI: "SAMPLE ANSWER" va "TAVSIYA" OLIB TASHLANDI
         prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
 O'quvchi quyidagi savolga javob berdi:
 
@@ -781,8 +782,6 @@ BARCHA IZOHLAR O'ZBEK TILIDA BO'LISHI SHART! Faqat ingliz tilidagi misollar ingl
 
 10. ✨ IMPROVED VERSION — o'quvchining speaking'ini to'liq yaxshilangan holda qayta yoz (IELTS 8+ darajada)
 
-11. 💡 TAVSIYA — 3-5 ta maslahat
-
 MUHIM: 
 - BARCHA IZOHLAR O'ZBEK TILIDA!
 - Tabiiy, jonli tilda yoz
@@ -791,6 +790,7 @@ MUHIM:
 - Oxirida rag'batlantir
 - Markdown belgilar ishlatma
 - Overall ni aniq foizda ko'rsat
+- "SAMPLE ANSWER" yoki "TAVSIYA" bo'limlarini QO'SHMA!
 O'zbek tilida yoz. Qisqa va aniq."""
 
         tr = groq_client.audio.transcriptions.create(
@@ -811,7 +811,6 @@ O'zbek tilida yoz. Qisqa va aniq."""
         ai_tahlil = f"⚠️ AI xatosi: {e}"
 
     # ==================== BALL HISOBLASH MANTIQI ====================
-    # 60%+ -> 1 ball, 50-59% -> 0.5 ball, 50% dan kam -> 0 ball
     if overall >= 60:
         ball = 1.0
     elif overall >= 50:
@@ -852,7 +851,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
         logger.error(f"AI tahlil yuborishda xatolik: {e}")
         await message.answer("⚠️ AI tahlilini yuborishda xatolik yuz berdi.")
 
-    # Adminga xabar yuborish
+    # Adminga xabar yuborish (ixtiyoriy)
     try:
         student_ism = data["students"].get(user_id, {}).get("ism", "Nomalum")
         await bot.send_message(
@@ -868,7 +867,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
     except Exception as e:
         logger.error(f"Adminga xabar yuborishda xatolik: {e}")
 
-    # O'quvchiga qisqa xulosa
+    # O'quvchiga qisqa xulosa (endi "o'qituvchi baholagandan keyin" yo'q)
     if ball == 1.0:
         xulosa = "✅ Ajoyib! To'liq ball oldingiz."
     elif ball == 0.5:
