@@ -741,7 +741,8 @@ async def audio_qabul(message: types.Message, state: FSMContext):
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     overall = 0
     try:
-        # PROMPT YANGILANDI: "SAMPLE ANSWER" va "TAVSIYA" OLIB TASHLANDI
+        # ==================== TO'G'RILANGAN PROMPT ====================
+        # SAMPLE ANSWER va TAVSIYA OLIB TASHLANDI
         prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
 O'quvchi quyidagi savolga javob berdi:
 
@@ -791,6 +792,7 @@ MUHIM:
 - Markdown belgilar ishlatma
 - Overall ni aniq foizda ko'rsat
 - "SAMPLE ANSWER" yoki "TAVSIYA" bo'limlarini QO'SHMA!
+- Faqat tahlil va ball qo'yishga e'tibor ber!
 O'zbek tilida yoz. Qisqa va aniq."""
 
         tr = groq_client.audio.transcriptions.create(
@@ -851,7 +853,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
         logger.error(f"AI tahlil yuborishda xatolik: {e}")
         await message.answer("⚠️ AI tahlilini yuborishda xatolik yuz berdi.")
 
-    # Adminga xabar yuborish (ixtiyoriy)
+    # Adminga xabar yuborish
     try:
         student_ism = data["students"].get(user_id, {}).get("ism", "Nomalum")
         await bot.send_message(
@@ -867,7 +869,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
     except Exception as e:
         logger.error(f"Adminga xabar yuborishda xatolik: {e}")
 
-    # O'quvchiga qisqa xulosa (endi "o'qituvchi baholagandan keyin" yo'q)
+    # O'quvchiga qisqa xulosa
     if ball == 1.0:
         xulosa = "✅ Ajoyib! To'liq ball oldingiz."
     elif ball == 0.5:
