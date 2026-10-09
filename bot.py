@@ -23,14 +23,14 @@ logger = logging.getLogger(__name__)
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-DATA_FILE = "/data/data.json"
+# Render'da /data papkasi mavjud emas, shuning uchun oddiy fayl
+DATA_FILE = "data.json"
 
 DEFAULT_DATA = {
     "students": {},
     "pending_students": {},
     "tasks": {},
     "submissions": {},
-    "warnings": {},
 }
 
 bot = Bot(token=TOKEN)
@@ -53,7 +53,6 @@ def load_data():
 
 def save_data(data):
     try:
-        os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except OSError as e:
@@ -84,14 +83,6 @@ class VazifaBerish(StatesGroup):
 class AudioYuborish(StatesGroup):
     vazifa_id = State()
     savol_raqami = State()
-
-
-class VazifaOchirish(StatesGroup):
-    vazifa_id = State()
-
-
-class OquvchiOchirish(StatesGroup):
-    user_id = State()
 
 
 # ==================== MENYULAR ====================
@@ -152,6 +143,7 @@ async def start_handler(message: types.Message, state: FSMContext):
     data = load_data()
     user_id_str = str(user_id)
 
+    # Agar allaqachon ro'yxatdan o'tgan bo'lsa - menyuni ko'rsat
     if user_id_str in data["students"] and data["students"][user_id_str].get("ism"):
         student = data["students"][user_id_str]
         await message.answer(
@@ -160,10 +152,12 @@ async def start_handler(message: types.Message, state: FSMContext):
         )
         return
 
+    # Agar so'rov yuborilgan bo'lsa - kutish
     if user_id_str in data["pending_students"]:
         await message.answer("⏳ Sizning so'rovingiz admin tasdiqlashini kutmoqda.")
         return
 
+    # Yangi ro'yxatdan o'tish
     await message.answer(
         "👋 Salom! Botdan foydalanish uchun ro'yxatdan o'ting.\n\n"
         "1️⃣ Ism va familiyangizni yozing:"
@@ -741,8 +735,6 @@ async def audio_qabul(message: types.Message, state: FSMContext):
     ai_tahlil = "⚠️ AI tahlil qila olmadi."
     overall = 0
     try:
-        # ==================== TO'G'RILANGAN PROMPT ====================
-        # SAMPLE ANSWER va TAVSIYA OLIB TASHLANDI
         prompt = f"""Sen IELTS Speaking examiner va ingliz tili o'qituvchisisan.
 O'quvchi quyidagi savolga javob berdi:
 
@@ -781,8 +773,6 @@ BARCHA IZOHLAR O'ZBEK TILIDA BO'LISHI SHART! Faqat ingliz tilidagi misollar ingl
 
 9. 🧠 CONTENT — javob to'liqligi
 
-10. ✨ IMPROVED VERSION — o'quvchining speaking'ini to'liq yaxshilangan holda qayta yoz (IELTS 8+ darajada)
-
 MUHIM: 
 - BARCHA IZOHLAR O'ZBEK TILIDA!
 - Tabiiy, jonli tilda yoz
@@ -792,7 +782,6 @@ MUHIM:
 - Markdown belgilar ishlatma
 - Overall ni aniq foizda ko'rsat
 - "SAMPLE ANSWER" yoki "TAVSIYA" bo'limlarini QO'SHMA!
-- Faqat tahlil va ball qo'yishga e'tibor ber!
 O'zbek tilida yoz. Qisqa va aniq."""
 
         tr = groq_client.audio.transcriptions.create(
@@ -812,14 +801,12 @@ O'zbek tilida yoz. Qisqa va aniq."""
         logger.error(f"Groq xatosi: {e}")
         ai_tahlil = f"⚠️ AI xatosi: {e}"
 
-    # ==================== BALL HISOBLASH MANTIQI ====================
     if overall >= 60:
         ball = 1.0
     elif overall >= 50:
         ball = 0.5
     else:
         ball = 0.0
-    # ================================================================
 
     if task_id not in data["submissions"]:
         data["submissions"][task_id] = {}
@@ -840,20 +827,17 @@ O'zbek tilida yoz. Qisqa va aniq."""
 
     data["submissions"][task_id][user_id]["total_ball"] = total_ball
 
-    # O'quvchining umumiy balliga qo'shish
     if user_id in data["students"]:
         data["students"][user_id]["ball"] = data["students"][user_id].get("ball", 0) + ball
 
     save_data(data)
 
-    # AI tahlilni o'quvchiga yuborish
     try:
         await message.answer(ai_tahlil)
     except Exception as e:
         logger.error(f"AI tahlil yuborishda xatolik: {e}")
         await message.answer("⚠️ AI tahlilini yuborishda xatolik yuz berdi.")
 
-    # Adminga xabar yuborish
     try:
         student_ism = data["students"].get(user_id, {}).get("ism", "Nomalum")
         await bot.send_message(
@@ -869,7 +853,6 @@ O'zbek tilida yoz. Qisqa va aniq."""
     except Exception as e:
         logger.error(f"Adminga xabar yuborishda xatolik: {e}")
 
-    # O'quvchiga qisqa xulosa
     if ball == 1.0:
         xulosa = "✅ Ajoyib! To'liq ball oldingiz."
     elif ball == 0.5:
@@ -910,7 +893,6 @@ async def kelgan_javoblar(message: types.Message):
             text += f"   👤 {student.get('ism', 'Nomalum')} — 🎤 {len(audios)} ta audio\n"
         text += "\n"
 
-    text += "Batafsil ma'lumot uchun '📊 Statistika' bo'limiga o'ting."
     await message.answer(text, reply_markup=admin_menu())
 
 
