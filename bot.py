@@ -139,16 +139,6 @@ def ortga_menu():
     )
 
 
-def baho_tugmalari(user_id, task_id):
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ 1 ball", callback_data=f"ball_{user_id}_{task_id}_1.0"),
-            InlineKeyboardButton(text="⚠️ 0.5 ball", callback_data=f"ball_{user_id}_{task_id}_0.5"),
-            InlineKeyboardButton(text="❌ 0 ball", callback_data=f"ball_{user_id}_{task_id}_0.0"),
-        ]
-    ])
-
-
 # ==================== START ====================
 @dp.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
@@ -821,7 +811,7 @@ O'zbek tilida yoz. Qisqa va aniq."""
         ai_tahlil = f"⚠️ AI xatosi: {e}"
 
     # ==================== BALL HISOBLASH MANTIQI ====================
-    # 60%+ → 1 ball, 50-59% → 0.5 ball, 50% dan kam → 0 ball
+    # 60%+ -> 1 ball, 50-59% -> 0.5 ball, 50% dan kam -> 0 ball
     if overall >= 60:
         ball = 1.0
     elif overall >= 50:
@@ -948,9 +938,9 @@ async def natijam(message: types.Message):
         if audios:
             savollar_soni = task.get("savollar_soni", 0)
             text += f"📚 {task['nomi']} ({len(audios)}/{savollar_soni}):\n"
-            for savol_raqavami, audio in audios.items():
-               ol ball = audio.get(":ball", 0 {)
-                text += f"   {savol_raqami}-sball} ball\n"
+            for savol_raqami, audio in audios.items():
+                ball = audio.get("ball", 0)
+                text += f"   {savol_raqami}-savol: {ball} ball\n"
             text += f"   Jami: {sub.get('total_ball', 0)} ball\n\n"
 
     await message.answer(text, reply_markup=oquvchi_menu())
